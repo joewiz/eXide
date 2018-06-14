@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-    <restrictions execute-query="yes" guest="yes">
+    <!--
+        - execute-query=yes|no controls if non-dba users are allowed to execute XQuery code 
+            from within eXide
+        - guest=yes|no|force-login controls if the default guest user is allowed to access the app.
+            "yes" allows access, "no" prevents all access, and "login-only" presents guest users 
+            with a login dialog but no other elements of the app
+    -->
+    <restrictions execute-query="no" guest="no">
         <!-- 
             Disallow access to certain collections. When using this,
             you always (!) want to deny access to the eXide collection as
