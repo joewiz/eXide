@@ -1052,9 +1052,9 @@ eXide.edit.XQueryModeHelper = (function () {
     
     Constr.prototype.runTest = function(doc) {
         var self = this;
-        this.xqlint(doc);
-        var info = new eXide.edit.ModuleInfo(doc.ast);
-        if (info.isModule() && info.hasTests()) {
+//        this.xqlint(doc);
+//        var info = new eXide.edit.ModuleInfo(doc.ast);
+//        if (info.isModule() && info.hasTests()) {
             $.ajax({
                 type: "POST",
                 url: "modules/run-test.xql",
@@ -1070,7 +1070,7 @@ eXide.edit.XQueryModeHelper = (function () {
 					eXide.util.error(xhr.responseText, "Server Error");
 				}
             })
-        }
+//        }
     };
     
     Constr.prototype.createOutline = function(doc, onComplete) {
