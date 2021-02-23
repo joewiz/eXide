@@ -16,7 +16,7 @@
  :  You should have received a copy of the GNU General Public License
  :  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  :)
-xquery version "3.0";
+xquery version "3.1";
 
 declare namespace json="http://json.org/";
 declare namespace xqdoc="http://www.xqdoc.org/1.0";

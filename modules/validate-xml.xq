@@ -16,7 +16,7 @@
  :  You should have received a copy of the GNU General Public License
  :  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  :)
-xquery version "3.0";
+xquery version "3.1";
 
 declare namespace catalog="urn:oasis:names:tc:entity:xmlns:xml:catalog";
 declare namespace vc="http://www.w3.org/2007/XMLSchema-versioning";

@@ -1,4 +1,4 @@
-xquery version "1.0";
+xquery version "3.1";
 
 declare option exist:serialize "method=xml media-type=text/xml";
 

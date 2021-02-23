@@ -16,7 +16,7 @@
  :  You should have received a copy of the GNU General Public License
  :  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  :)
-xquery version "1.0";
+xquery version "3.1";
 
 import module namespace file="http://exist-db.org/xquery/file" at "java:org.exist.xquery.modules.file.FileModule";
 import module namespace apputil="http://exist-db.org/apps/eXide/apputil" at "util.xqm";

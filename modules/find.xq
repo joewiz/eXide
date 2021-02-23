@@ -1,4 +1,4 @@
-xquery version "3.0";
+xquery version "3.1";
 
 declare namespace find="http://exist-db.org/xquery/eXide/find";
 
