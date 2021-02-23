@@ -1,13 +1,15 @@
 xquery version "3.1";
 
+declare namespace exist="http://exist.sourceforge.net/NS/exist";
 declare namespace json="http://www.json.org";
 
-import module namespace config="http://exist-db.org/xquery/apps/config" at "/db/apps/eXide/modules/config.xqm";
+import module namespace config="http://exist-db.org/xquery/apps/config" at "modules/config.xqm";
 
 declare variable $exist:path external;
 declare variable $exist:resource external;
-declare variable $exist:prefix external;
 declare variable $exist:controller external;
+declare variable $exist:prefix external;
+declare variable $exist:root external;
 
 (: Determine if the persistent login module is available :)
 declare variable $login :=

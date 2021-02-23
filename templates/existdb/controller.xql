@@ -1,5 +1,7 @@
 xquery version "3.1";
 
+declare namespace exist="http://exist.sourceforge.net/NS/exist";
+
 declare variable $exist:path external;
 declare variable $exist:resource external;
 declare variable $exist:controller external;
@@ -10,7 +12,6 @@ if ($exist:path eq '') then
     <dispatch xmlns="http://exist.sourceforge.net/NS/exist">
         <redirect url="{request:get-uri()}/"/>
     </dispatch>
-    
 else if ($exist:path eq "/") then
     (: forward root path to index.html :)
     <dispatch xmlns="http://exist.sourceforge.net/NS/exist">
