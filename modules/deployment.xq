@@ -326,7 +326,7 @@ declare function deploy:expand-xql($target as xs:string) {
             <param name="config-namespace" value="{$name}/config"/>
         </parameters>
     let $storeTemplates := deploy:shared-modules($includeTmpl, $target)
-    for $module in ("view.xql", "app.xql", "config.xqm")
+    for $module in ("view.xq", "app.xqm", "config.xqm")
     return
         deploy:expand($target || "/modules", $module, $parameters)
 };
@@ -496,15 +496,15 @@ declare function deploy:view($collection as xs:string?, $expathConf as element()
                     <li>
                         <div class="hint">Optional: name of an XQuery script which will be run <b>before</b> the
                         application is installed. Use this to create users, index configurations and the like.</div>
-                        <input type="text" name="prepare" value="{if ($repoConf) then $repoConf/repo:prepare else 'pre-install.xql'}"
-                            placeholder="pre-install.xql" size="40"/>
+                        <input type="text" name="prepare" value="{if ($repoConf) then $repoConf/repo:prepare else 'pre-install.xq'}"
+                            placeholder="pre-install.xq" size="40"/>
                         <label for="prepare">Pre-install XQuery:</label>
                     </li>
                     <li>
                         <div class="hint">Optional: name of an XQuery script which will be run <b>after</b> the
                         application was installed.</div>
                         <input type="text" name="finish" value="{$repoConf/repo:finish}" size="40"
-                            placeholder="post-install.xql"/>
+                            placeholder="post-install.xq"/>
                         <label for="finish">Post-install XQuery:</label>
                     </li>
                 </ol>

@@ -12,7 +12,7 @@ import module namespace templates="http://exist-db.org/xquery/templates" $$templ
  : templating.
  :)
 import module namespace config="$$config-namespace$$" at "config.xqm";
-import module namespace app="$$namespace$$" at "app.xql";
+import module namespace app="$$namespace$$" at "app.xqm";
 
 declare namespace output = "http://www.w3.org/2010/xslt-xquery-serialization";
 

@@ -249,7 +249,7 @@ eXide.browse.ResourceBrowser = (function () {
             if (!$this.oldValue) {
                 return;
             }
-            $.getJSON("modules/collections.xql", {
+            $.getJSON("modules/collections.xq", {
 					target: $this.data[args.row].name,
                     rename: $this.oldValue,
 					root: $this.collection
@@ -290,7 +290,7 @@ eXide.browse.ResourceBrowser = (function () {
             		}
                     var params = $("form", dialog).serialize();
                     params = params + "&" + $.param({ "modify[]": resources});
-                    $.getJSON("modules/collections.xql", params,
+                    $.getJSON("modules/collections.xq", params,
                         function(data) {
                             $(dialog).dialog("close");
                             $this.reload();
@@ -377,7 +377,7 @@ eXide.browse.ResourceBrowser = (function () {
 		this.loading = true;
         end += 20;
 		var params = { root: this.collection, view: "r", start: start, end: end };
-		$.getJSON("modules/collections.xql", params, function (data) {
+		$.getJSON("modules/collections.xq", params, function (data) {
 		    $this.loading = false;
 			for (var i = start; i <= end; i++) {
 				$this.grid.invalidateRow(i);
@@ -427,7 +427,7 @@ eXide.browse.ResourceBrowser = (function () {
 			"<input type=\"text\" name=\"collection\" id=\"eXide-browse-collection-name\"/>",
 			function () {
 			    $("#eXide-browse-spinner").show();
-				$.getJSON("modules/collections.xql", {
+				$.getJSON("modules/collections.xq", {
 						create: $("#eXide-browse-collection-name").val(),
 						collection: $this.collection
 					},
@@ -449,7 +449,7 @@ eXide.browse.ResourceBrowser = (function () {
 		eXide.util.Dialog.input("Confirm Deletion", "Are you sure you want to delete collection " + $this.selected + "?",
 			function () {
 			    $("#eXide-browse-spinner").show();
-				$.getJSON("modules/collections.xql", {
+				$.getJSON("modules/collections.xq", {
     					remove: $this.collection
     				},
     				function (data) {
@@ -477,7 +477,7 @@ eXide.browse.ResourceBrowser = (function () {
 		eXide.util.Dialog.input("Confirm Deletion", "Are you sure you want to delete the selected resources?",
 				function () {
 				    $("#eXide-browse-spinner").show();
-					$.getJSON("modules/collections.xql", {
+					$.getJSON("modules/collections.xq", {
 							remove: resources,
 							root: $this.collection
 						},
@@ -504,7 +504,7 @@ eXide.browse.ResourceBrowser = (function () {
             }
 		}
         if (resources.length > 0) {
-            $("#resource-properties-content").load("modules/collections.xql", { "properties": resources });
+            $("#resource-properties-content").load("modules/collections.xq", { "properties": resources });
             $("#resource-properties-dialog").dialog("open");
         }
     };
@@ -536,7 +536,7 @@ eXide.browse.ResourceBrowser = (function () {
         $.log("Pasting resources %o to %s in mode %s", this.clipboard, this.collection, this.clipboardMode);
         var params = { root: this.collection };
         params[this.clipboardMode] = this.clipboard;
-		$.getJSON("modules/collections.xql", params,
+		$.getJSON("modules/collections.xq", params,
 			function (data) {
 				$.log(data.status);
 				if (data.status == "fail") {

@@ -35,7 +35,7 @@ eXide.edit.Projects = (function(oop) {
     
     Constr.prototype.getProject = function (collection, callback) {
         var $this = this;
-        $.getJSON("modules/deployment.xql", { info: collection }, function (data) {
+        $.getJSON("modules/deployment.xq", { info: collection }, function (data) {
             if (!data) {
                 if (typeof callback == "function") {
                     callback(null);
@@ -153,7 +153,7 @@ eXide.edit.PackageEditor = (function () {
                     
                     var params = $this.syncDialog.find("form").serialize();
 					$("#synchronize-report").text("Synchronization in progress ...");
-					$("#synchronize-report").load("modules/synchronize.xql", params);
+					$("#synchronize-report").load("modules/synchronize.xq", params);
 				},
 				"Close": function () { $(this).dialog("close"); }
 			}
@@ -204,7 +204,7 @@ eXide.edit.PackageEditor = (function () {
                     
                     $(statusAnchor).text("Synchronization in progress ...");
 					$(statusAnchor).load(
-                        "modules/synchronize.xql", 
+                        "modules/synchronize.xq", 
                         { collection : $this.currentProject.root, start :start},
                         function(responseText, status){if(status == 'success') {eXide.app.git.command($this.currentProject, 'commit', option);}}
                         );
@@ -229,7 +229,7 @@ eXide.edit.PackageEditor = (function () {
 		if (collection)
 			params = { "collection": collection };
 		$.ajax({
-			url: "modules/deployment.xql",
+			url: "modules/deployment.xq",
 			type: "POST",
 			data: params,
 			success: function (data) {
@@ -238,7 +238,7 @@ eXide.edit.PackageEditor = (function () {
 					done: function () {
 						var params = $this.container.find("form").serialize();
 						$.ajax({
-							url: "modules/deployment.xql",
+							url: "modules/deployment.xq",
 							type: "POST",
                             dataType: "json",
 							data: params,
@@ -281,7 +281,7 @@ eXide.edit.PackageEditor = (function () {
             if (target === "")
                 target = collection;
 			$.ajax({
-				url: "modules/deployment.xql",
+				url: "modules/deployment.xq",
 				type: "POST",
 				dataType: "json",
 				data: { "collection": collection, "target": target, "deploy": "true" },
@@ -306,7 +306,7 @@ eXide.edit.PackageEditor = (function () {
 	};
 
     Constr.prototype.download = function (collection) {
-        window.location.href = "modules/deployment.xql?download=true&collection=" + encodeURIComponent(collection);
+        window.location.href = "modules/deployment.xq?download=true&collection=" + encodeURIComponent(collection);
     };
     
 	/**
@@ -349,7 +349,7 @@ eXide.edit.PackageEditor = (function () {
                  dir: project.dir
              };
              $.ajax({
-                url: "modules/synchronize.xql",
+                url: "modules/synchronize.xq",
                 type: "GET",
                 data: params,
                 success: function(data) {

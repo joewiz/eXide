@@ -311,7 +311,7 @@ eXide.app = (function(util) {
                 return true;
             }
 			$.ajax({
-				url: "modules/load.xql?path=" + resource.path,
+				url: "modules/load.xq?path=" + resource.path,
 				dataType: 'text',
 				success: function (data, status, xhr) {
                     if (reload) {
@@ -462,7 +462,7 @@ eXide.app = (function(util) {
 				util.error("There are unsaved changes in the document. Please save it first.");
 				return;
 			}
-			window.location.href = "modules/load.xql?download=true&path=" + encodeURIComponent(doc.getPath());
+			window.location.href = "modules/load.xq?download=true&path=" + encodeURIComponent(doc.getPath());
 		},
         
 		runQuery: function(path, livePreview) {
@@ -1017,7 +1017,7 @@ eXide.app = (function(util) {
         },
        
         git: function() {
-            var gitUrl ='modules/git.xql',
+            var gitUrl ='modules/git.xq',
                 gitError = function(xhr, status) {
                            util.error("Failed to apply configuration: " + xhr.responseText);
                        },
@@ -1101,7 +1101,7 @@ eXide.app = (function(util) {
                     iframe.contentWindow.document.write("<html><body><p>Searching ...</p></body></html>");
                     iframe.contentWindow.document.close();
                     
-                    iframe.src = "modules/search.xql?" + searchParams;
+                    iframe.src = "modules/search.xq?" + searchParams;
                 });
             });
         },
@@ -1269,7 +1269,7 @@ eXide.app = (function(util) {
                 dataType: "json",
                 open: function() {
                     $.ajax({
-                	    url: "modules/get-template.xql",
+                	    url: "modules/get-template.xq",
             			type: "POST",
             			success: function(data) {
                 		    templates = data;

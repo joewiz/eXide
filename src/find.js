@@ -281,7 +281,7 @@ eXide.find.Modules = (function () {
             grid.resizeCanvas();
             grid.invalidate();
     	    moduleData.length = 0;
-            $.getJSON("modules/find.xql", function (data) {
+            $.getJSON("modules/find.xq", function (data) {
                 moduleData.length = data.length;
                 for (var i = 0; i < data.length; i++) {
                     moduleData[i] = data[i];
