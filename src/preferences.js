@@ -36,7 +36,8 @@ eXide.util.Preferences = (function () {
         indentOnLoad: true,
         expandXIncludesOnLoad: false,
         softWrap: -1,
-        emmet: false
+        emmet: false,
+        version: "3.1.0" // eXide.app.version() returns "Uncaught TypeError: Cannot read property 'version' of undefined"
 	};
     
     Constr = function(editor) {
@@ -173,7 +174,7 @@ eXide.util.Preferences = (function () {
     Constr.prototype.read = function() {
         var sameVersion = false;
         if (localStorage["eXide.preferences"]) {
-            this.preferences = JSON.parse(localStorage.getItem("eXide.preferences"));
+            this.preferences = Object.assign(defaultPreferences, JSON.parse(localStorage.getItem("eXide.preferences")));
             sameVersion = (this.preferences.version === eXide.app.version());
         }
 
