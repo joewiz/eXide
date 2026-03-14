@@ -70,15 +70,28 @@ eXide.edit.CodeValidator = (function () {
         }
 
         this.inProgress = true;
+        var startedAt = new Date().getTime();
         doc.getModeHelper().validate(doc, doc.getText(), function (success) {
+            // Check if document changed while compile was in flight,
+            // BEFORE updating lastValidation (which would mask the change)
+            var changedDuringValidation = doc.lastChangeEvent > startedAt;
+
             doc.lastValidation = new Date().getTime();
             self.inProgress = false;
-            self.deferred.resolve([success]);
-            self.deferred = null;
+            if (self.deferred) {
+                self.deferred.resolve([success]);
+                self.deferred = null;
+            }
 
             self.$triggerEvent("validate", [doc]);
             if (success) {
                 self.$triggerEvent("documentValid", [doc]);
+            }
+
+            // Re-validate with the newer code
+            if (changedDuringValidation && self.editor.activeDoc === doc) {
+                doc.lastValidation = 0; // force needsValidation() to return true
+                self.triggerDelayed(doc);
             }
         });
         return this.deferred;

@@ -888,6 +888,11 @@ Sub level menu list items (undo style from Top level List Items)
 
 #status-bar .status-right {
     margin-left: auto;
+    flex-shrink: 0;
+}
+
+#status-app, #status-type {
+    flex-shrink: 0;
 }
 
 /* ── Status bar segments (APP / TYPE) ── */
@@ -1118,6 +1123,8 @@ Sub level menu list items (undo style from Top level List Items)
     gap: 14px;
     font-size: 11px;
     color: #bee3f8;
+    min-width: 0;
+    overflow: hidden;
 }
 
 #status a:link, #status a:visited {

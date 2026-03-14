@@ -212,7 +212,7 @@ eXide.edit.XQueryModeHelper = (function () {
 	};
 	
     Constr.prototype.parseXQuery = function(doc) {
-        if (doc.ast && doc.lastValidation >= doc.getLastChanged()) {
+        if (doc.ast && doc.lastParsed >= doc.getLastChanged()) {
             return;
         }
         var value = doc.getText();
@@ -231,7 +231,7 @@ eXide.edit.XQueryModeHelper = (function () {
         // If 4.0 parser is still loading, re-parse when it arrives
         if (selection.pending) {
             parserRegistry.loadParser40().then(function () {
-                doc.lastValidation = 0; // force re-parse
+                doc.lastParsed = 0; // force re-parse
                 self.parseXQuery(doc);
             }).catch(function (err) {
                 console.warn("Failed to load XQuery 4.0 parser:", err.message);
@@ -244,7 +244,7 @@ eXide.edit.XQueryModeHelper = (function () {
         try {
             doc.ast = result.ast;
             doc.ast.markers = [];
-            doc.lastValidation = new Date().getTime();
+            doc.lastParsed = new Date().getTime();
 
             try {
                 var analysisResult = staticAnalysis.analyze(result.ast);

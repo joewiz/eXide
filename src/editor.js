@@ -38,6 +38,7 @@ eXide.edit.Document = (function() {
         this.externalLink = null;
         this.lastChangeEvent = new Date().getTime();
         this.lastValidation = 0;
+        this.lastParsed = 0;
         this.ast = null;
 
         // CM6: store the document text; the EditorState will be created
@@ -713,6 +714,7 @@ eXide.edit.Editor = (function () {
         editorUtils.clearAnnotations(this.editor);
         this.activeDoc.ast = null;
         this.activeDoc.lastValidation = 0;
+        this.activeDoc.lastParsed = 0;
         this.validator.triggerNow(this.activeDoc);
     };
 
