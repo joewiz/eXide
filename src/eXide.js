@@ -184,6 +184,17 @@ eXide.app = (function(util) {
                 app.restoreState(function(restored) {
                     app.updateLayoutTop();
                     editor.init();
+
+                    // Fetch registered module prefixes for static analysis
+                    fetch("api/editor/modules")
+                        .then(function(r) { return r.json(); })
+                        .then(function(modules) {
+                            if (Array.isArray(modules) && typeof staticAnalysis !== "undefined") {
+                                staticAnalysis.setRegisteredModules(modules);
+                            }
+                        })
+                        .catch(function() {});
+
                     if (afterInitCallback) {
                         afterInitCallback(restored);
                     }
@@ -1967,6 +1978,9 @@ eXide.app = (function(util) {
             });
             menu.click("#menu-navigate-history", function() {
                 editor.historyBack();
+            });
+            menu.click("#menu-navigate-diagnostics", function() {
+                editor.toggleDiagnostics();
             });
             menu.click("#menu-view-toggle-collections", function() {
                 app.toggleCollectionsPanel();

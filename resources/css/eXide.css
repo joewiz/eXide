@@ -531,6 +531,11 @@ a:link, a:visited {
     overflow: auto;
 }
 
+/* Cmd+Click / Ctrl+Click go-to-definition: pointer cursor when modifier held */
+.cm-goto-clickable {
+    cursor: pointer !important;
+}
+
 /* Lint gutter markers — square badge with × / ! instead of default SVG dot.
    CM6 sets `content` on the element itself (SVG data URI), which makes it a
    replaced element. Override `content` directly to show our text character. */
@@ -578,6 +583,15 @@ a:link, a:visited {
     font-style: italic;
     line-height: 12px !important;
     background: #3182ce;
+}
+
+.cm-panel-lint {
+    max-height: 150px;
+    font-size: 12px;
+}
+
+.cm-panel-lint ul {
+    max-height: 130px;
 }
 
 .cm-lineNumbers .cm-gutterElement {

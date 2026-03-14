@@ -28,6 +28,7 @@ eXide.edit.MarkdownModeHelper = (function () {
         this.editor = this.parent.editor;
         this.addCommand("locate", this.locate);
         this.addCommand("format", this.format);
+        this.addCommand("gotoSymbol", this.gotoSymbol);
     };
 
     eXide.util.oop.inherit(Constr, eXide.edit.ModeHelper);

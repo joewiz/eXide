@@ -38,8 +38,10 @@
         var row = Math.max(0, line - 1);
         var offset = rowColToOffset(view.state, row, column || 0);
         view.dispatch({
-            selection: { anchor: offset },
-            scrollIntoView: true
+            selection: { anchor: offset }
+        });
+        view.dispatch({
+            effects: CM6.EditorView.scrollIntoView(offset, { y: "center" })
         });
         view.focus();
     }

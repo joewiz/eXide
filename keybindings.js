@@ -46,5 +46,6 @@
     "gotoTab6": {"key": "Alt-6", "mac": "Ctrl-6"},
     "gotoTab7": {"key": "Alt-7", "mac": "Ctrl-7"},
     "gotoTab8": {"key": "Alt-8", "mac": "Ctrl-8"},
-    "gotoTab9": {"key": "Alt-9", "mac": "Ctrl-9"}
+    "gotoTab9": {"key": "Alt-9", "mac": "Ctrl-9"},
+    "toggleDiagnostics": {"key": "Ctrl-Shift-d", "mac": "Mod-Shift-d"}
 }

@@ -31,6 +31,7 @@ eXide.edit.ModeHelper = (function () {
         this.commands = {};
         this.addCommand("locate", this.locate);
         this.addCommand("format", this.format);
+        this.addCommand("gotoSymbol", this.gotoSymbol);
     }
 
     Constr.prototype = {
@@ -49,12 +50,13 @@ eXide.edit.ModeHelper = (function () {
         },
 
         exec: function (command, doc, args) {
-            if (this.commands && this.commands[command]) {
+            var fn = (this.commands && this.commands[command]) || this[command];
+            if (typeof fn === "function") {
                 var nargs = [doc];
                 for (var i = 0; i < args.length; i++) {
                     nargs.push(args[i]);
                 }
-                this.commands[command].apply(this, nargs);
+                fn.apply(this, nargs);
             } else {
                 eXide.util.message(command + " not supported in this mode.")
             }
@@ -140,6 +142,37 @@ eXide.edit.ModeHelper = (function () {
                 console.log("Error formatting code: %s", e.message);
                 eXide.util.error("Code could not be formatted: " + e.message);
             });
+        },
+
+        gotoSymbol: function(doc) {
+            var self = this;
+            if (!doc.functions || doc.functions.length === 0) {
+                eXide.util.message("No symbols found.");
+                return;
+            }
+            var items = doc.functions.map(function(f) {
+                return {
+                    label: f.signature || f.name,
+                    name: f.name,
+                    row: f.row,
+                    from: f.from
+                };
+            });
+            eXide.util.QuickPicker.show(items, function(selected) {
+                if (selected) {
+                    if (selected.from !== undefined) {
+                        self.editor.dispatch({
+                            selection: { anchor: selected.from }
+                        });
+                        self.editor.dispatch({
+                            effects: CM6.EditorView.scrollIntoView(selected.from, { y: "center" })
+                        });
+                        self.editor.focus();
+                    } else if (selected.row !== undefined) {
+                        editorUtils.gotoLine(self.editor, selected.row + 1, 0, true);
+                    }
+                }
+            }, { placeholder: "Go to symbol\u2026", parentEditor: self.editor });
         },
 
         getTemplates: function (doc, prefix, popupItems) {

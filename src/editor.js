@@ -281,6 +281,32 @@ eXide.edit.Editor = (function () {
                 icons: true
             })),
             CM6.scrollPastEnd(),
+            EditorView.domEventHandlers({
+                click: function(event, view) {
+                    // Cmd+Click (Mac) or Ctrl+Click (other) → go to definition
+                    var isMac = /Mac|iPhone|iPod|iPad/.test(navigator.platform);
+                    if ((isMac && event.metaKey) || (!isMac && event.ctrlKey)) {
+                        event.preventDefault();
+                        $this.exec("gotoDefinition");
+                        return true;
+                    }
+                },
+                keydown: function(event, view) {
+                    var isMac = /Mac|iPhone|iPod|iPad/.test(navigator.platform);
+                    if ((isMac && event.key === "Meta") || (!isMac && event.key === "Control")) {
+                        view.contentDOM.classList.add("cm-goto-clickable");
+                    }
+                },
+                keyup: function(event, view) {
+                    var isMac = /Mac|iPhone|iPod|iPad/.test(navigator.platform);
+                    if ((isMac && event.key === "Meta") || (!isMac && event.key === "Control")) {
+                        view.contentDOM.classList.remove("cm-goto-clickable");
+                    }
+                },
+                blur: function(event, view) {
+                    view.contentDOM.classList.remove("cm-goto-clickable");
+                }
+            }),
             EditorView.updateListener.of(function(update) {
                 if (update.docChanged && $this.activeDoc && !$this._switching) {
                     if ($this.activeDoc.saved) {
@@ -914,6 +940,15 @@ eXide.edit.Editor = (function () {
 
     Constr.prototype.clearErrors = function () {
         editorUtils.clearAnnotations(this.editor);
+    };
+
+    Constr.prototype.toggleDiagnostics = function () {
+        var panel = this.editor.dom.querySelector(".cm-panel-lint");
+        if (panel) {
+            CM6.closeLintPanel(this.editor);
+        } else {
+            CM6.openLintPanel(this.editor);
+        }
     };
 
     Constr.prototype.forEachDocument = function(callback) {

@@ -85,7 +85,8 @@ eXide.edit.commands = (function () {
         removeTags: "Remove Tags", extractFunction: "Extract Function",
         extractVariable: "Extract Variable", openTab: "Switch Editor",
         toggleQueryResults: "Toggle Results", commandPalette: "Command Palette",
-        findFiles: "Find in Files"
+        findFiles: "Find in Files",
+        toggleDiagnostics: "Toggle Diagnostics Panel"
     };
 
     function humanName(id) {
@@ -126,6 +127,10 @@ eXide.edit.commands = (function () {
                     });
                     addCommand("historyBack", getKeyBinding(kb, "historyBack"), function() {
                         parent.historyBack();
+                        return true;
+                    });
+                    addCommand("toggleDiagnostics", getKeyBinding(kb, "toggleDiagnostics"), function() {
+                        parent.toggleDiagnostics();
                         return true;
                     });
                     addCommand("fold", getKeyBinding(kb, "fold"), function(view) {

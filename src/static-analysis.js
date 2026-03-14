@@ -15,6 +15,9 @@ var staticAnalysis = (function () {
     var WARNING = "warning";
     var LANG = "xquery";
 
+    // Registered module prefixes fetched from the server at startup
+    var registeredModulePrefixes = {};
+
     function warningMarker(pos, msg) {
         return { pos: pos, lang: LANG, type: WARNING, level: WARNING, message: msg };
     }
@@ -81,16 +84,22 @@ var staticAnalysis = (function () {
 
         // -- Namespace tracking --
         var namespaces = {
+            // W3C standard prefixes (always known)
             "local": "http://www.w3.org/2005/xquery-local-functions",
             "xs": "http://www.w3.org/2001/XMLSchema",
             "fn": "http://www.w3.org/2005/xpath-functions",
-            "jn": "http://www.jsoniq.org/functions",
-            "an": "http://www.zorba-xquery.com/annotations",
-            "db": "http://www.zorba-xquery.com/modules/store/static/collections/dml",
-            "idx": "http://www.zorba-xquery.com/modules/store/static/indexes/dml",
-            "zerr": "http://www.zorba-xquery.com/errors",
-            "err": "http://www.w3.org/2005/xqt-error"
+            "math": "http://www.w3.org/2005/xpath-functions/math",
+            "map": "http://www.w3.org/2005/xpath-functions/map",
+            "array": "http://www.w3.org/2005/xpath-functions/array",
+            "err": "http://www.w3.org/2005/xqt-error",
+            "output": "http://www.w3.org/2010/xslt-xquery-serialization"
         };
+        // Merge server-registered module prefixes (fetched at startup)
+        for (var p in registeredModulePrefixes) {
+            if (!namespaces[p]) {
+                namespaces[p] = registeredModulePrefixes[p];
+            }
+        }
         var declaredNS = {
             "jn": { ns: "http://www.jsoniq.org/functions", pos: { sl: 0, sc: 0, el: 0, ec: 0 }, type: "module", auto: true },
             "fn": { ns: "http://www.w3.org/2005/xpath-functions", pos: { sl: 0, sc: 0, el: 0, ec: 0 }, type: "module", auto: true }
@@ -694,7 +703,17 @@ var staticAnalysis = (function () {
         return { markers: markers };
     }
 
-    return { analyze: analyze };
+    return {
+        analyze: analyze,
+        setRegisteredModules: function (modules) {
+            registeredModulePrefixes = {};
+            for (var i = 0; i < modules.length; i++) {
+                if (modules[i].prefix && modules[i].uri) {
+                    registeredModulePrefixes[modules[i].prefix] = modules[i].uri;
+                }
+            }
+        }
+    };
 })();
 
 // Browser global (needed when bundled by esbuild)

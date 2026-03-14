@@ -46,6 +46,7 @@ eXide.edit.XMLModeHelper = (function () {
         this.addCommand("rename", this.rename);
         this.addCommand("expandSelection", this.selectElement);
         this.addCommand("format", this.format);
+        this.addCommand("gotoSymbol", this.gotoSymbol);
     }
 
     eXide.util.oop.inherit(Constr, eXide.edit.ModeHelper);
@@ -76,6 +77,8 @@ eXide.edit.XMLModeHelper = (function () {
         var state = this.editor.state;
         var tree = CM6.ensureSyntaxTree(state, state.doc.length, 5000) || CM6.syntaxTree(state);
         var depth = 0;
+        var pathStack = [];    // track XPath steps with positional predicates
+        var siblingStack = [{}]; // stack of { tagName: count } maps per depth
         tree.iterate({
             enter: function(node) {
                 if (node.name === "Element" || node.name === "SelfClosingTag") {
@@ -110,13 +113,19 @@ eXide.edit.XMLModeHelper = (function () {
                     }
                     if (tagNameNode) {
                         var tagName = state.sliceDoc(tagNameNode.from, tagNameNode.to);
+                        // Track sibling position at current depth
+                        var siblings = siblingStack[siblingStack.length - 1];
+                        siblings[tagName] = (siblings[tagName] || 0) + 1;
+                        var step = tagName + "[" + siblings[tagName] + "]";
+                        pathStack.push(step);
+                        siblingStack.push({}); // new sibling scope for children
                         var hint = "";
                         var chosen = pickAttr(attrs);
                         if (chosen) {
                             hint = chosen.value;
                             if (hint.length > 30) hint = hint.substring(0, 30) + "…";
                         }
-                        var sigParts = attrs.map(function(a) { return a.name + '="' + a.value + '"'; });
+                        var xpath = "/" + pathStack.join("/");
                         var line = state.doc.lineAt(node.from);
                         doc.functions.push({
                             type: eXide.edit.Document.TYPE_FUNCTION,
@@ -125,12 +134,15 @@ eXide.edit.XMLModeHelper = (function () {
                             hint: hint,
                             outlineClass: "outline-element",
                             source: doc.getPath(),
-                            signature: "<" + tagName + (sigParts.length ? " " + sigParts.join(" ") : "") + ">",
+                            signature: xpath,
                             sort: String(line.number).padStart(6, "0"),
                             row: line.number - 1,
                             from: node.from,
                             to: node.to
                         });
+                    } else {
+                        pathStack.push("?");
+                        siblingStack.push({});
                     }
                     depth++;
                 } else if (node.name === "Comment") {
@@ -158,6 +170,8 @@ eXide.edit.XMLModeHelper = (function () {
             leave: function(node) {
                 if (node.name === "Element" || node.name === "SelfClosingTag") {
                     depth--;
+                    pathStack.pop();
+                    siblingStack.pop();
                 }
             }
         });

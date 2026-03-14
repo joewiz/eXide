@@ -57,7 +57,8 @@ eXide.edit.LspHover = (function () {
         .then(function (response) { return response.json(); })
         .then(function (data) {
             if (!data || !data.contents) {
-                return null;
+                // Fallback: look up local function signature from AST
+                return localHoverFallback(view, pos, line, column);
             }
 
             // Find the word boundaries at the hover position for highlighting
@@ -105,6 +106,77 @@ eXide.edit.LspHover = (function () {
         .catch(function () {
             return null;
         });
+    }
+
+    /**
+     * Client-side hover fallback: look up local function/variable from AST
+     * when the server's lsp:hover() returns nothing.
+     */
+    function localHoverFallback(view, pos, line, column) {
+        var doc = eXide.app.getEditor().getActiveDocument();
+        if (!doc || !doc.ast) return null;
+
+        var lead = { line: line.number - 1, col: column };
+        var astNode = eXide.edit.XQueryUtils.findNode(doc.ast, lead);
+        if (!astNode) return null;
+
+        // Check if we're on a FunctionCall
+        var fcall = eXide.edit.XQueryUtils.findAncestor(astNode, "FunctionCall");
+        var signature = null;
+        if (fcall) {
+            var nameNode = eXide.edit.XQueryUtils.findChild(fcall, "EQName");
+            if (nameNode) {
+                var funcName = eXide.edit.XQueryUtils.getValue(nameNode);
+                var arity = fcall.arity || 0;
+                // Search outline for matching function
+                for (var i = 0; i < doc.functions.length; i++) {
+                    var f = doc.functions[i];
+                    if (f.type === "function" && f.name === funcName) {
+                        signature = f.signature || funcName + "#" + arity;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Check if we're on a VarRef
+        if (!signature) {
+            var varRef = eXide.edit.XQueryUtils.findAncestor(astNode, ["VarRef", "VarName"]);
+            if (varRef) {
+                var varEQName = eXide.edit.XQueryUtils.findChild(
+                    varRef.name === "VarRef" ? varRef : varRef, "EQName"
+                );
+                if (varEQName) {
+                    signature = "$" + eXide.edit.XQueryUtils.getValue(varEQName);
+                }
+            }
+        }
+
+        if (!signature) return null;
+
+        // Build word boundaries for tooltip positioning
+        var wordStart = pos;
+        var wordEnd = pos;
+        var text = line.text;
+        var col = column;
+        while (col > 0 && /[\w:\-$]/.test(text[col - 1])) { col--; wordStart--; }
+        col = column;
+        while (col < text.length && /[\w:\-]/.test(text[col])) { col++; wordEnd++; }
+
+        return {
+            pos: wordStart,
+            end: wordEnd,
+            above: true,
+            create: function () {
+                var dom = document.createElement("div");
+                dom.className = "cm-lsp-hover";
+                var sig = document.createElement("code");
+                sig.className = "cm-lsp-hover-signature";
+                sig.textContent = signature;
+                dom.appendChild(sig);
+                return { dom: dom };
+            }
+        };
     }
 
     function extension() {
