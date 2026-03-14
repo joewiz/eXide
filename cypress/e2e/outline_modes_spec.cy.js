@@ -87,10 +87,10 @@ describe('Outline modes and filter', () => {
     // Type a filter that matches only some functions
     cy.get('#outline-filter').clear().type('access')
 
-    // The filter hides non-matching links via display:none on the <a>
+    // The filter hides non-matching <li> elements via display:none
     // Some items should be hidden
-    cy.get('#outline li a').then(($links) => {
-      var visible = $links.filter(function () {
+    cy.get('#outline li').then(($items) => {
+      var visible = $items.filter(function () {
         return Cypress.$(this).css('display') !== 'none'
       })
       expect(visible.length).to.be.below(totalCount)
@@ -109,9 +109,9 @@ describe('Outline modes and filter', () => {
     // Clear the filter
     cy.get('#outline-filter').clear()
 
-    // All links should be visible again
-    cy.get('#outline li a').then(($links) => {
-      var visible = $links.filter(function () {
+    // All items should be visible again
+    cy.get('#outline li').then(($items) => {
+      var visible = $items.filter(function () {
         return Cypress.$(this).css('display') !== 'none'
       })
       expect(visible.length).to.eq(totalCount)
