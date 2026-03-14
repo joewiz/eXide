@@ -281,6 +281,7 @@ eXide.edit.Editor = (function () {
                 icons: true
             })),
             CM6.scrollPastEnd(),
+            editorUtils.flashField,
             EditorView.domEventHandlers({
                 click: function(event, view) {
                     // Cmd+Click (Mac) or Ctrl+Click (other) → go to definition

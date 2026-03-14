@@ -585,6 +585,27 @@ a:link, a:visited {
     background: #3182ce;
 }
 
+/* Navigation flash: brief highlight on the target line */
+.cm-goto-flash {
+    background: rgba(255, 213, 79, 0.4);
+    animation: goto-flash-fade 1.2s ease-out forwards;
+}
+
+@keyframes goto-flash-fade {
+    0% { background: rgba(255, 213, 79, 0.4); }
+    100% { background: transparent; }
+}
+
+body.dark .cm-goto-flash {
+    background: rgba(255, 213, 79, 0.2);
+    animation: goto-flash-fade-dark 1.2s ease-out forwards;
+}
+
+@keyframes goto-flash-fade-dark {
+    0% { background: rgba(255, 213, 79, 0.2); }
+    100% { background: transparent; }
+}
+
 .cm-panel-lint {
     max-height: 150px;
     font-size: 12px;

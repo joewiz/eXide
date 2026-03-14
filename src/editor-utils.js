@@ -11,6 +11,28 @@
     var CM6 = globalThis.CM6;
     var setDiagnostics = CM6.setDiagnostics;
 
+    // -- Navigation flash effect --
+    // Briefly highlights the target line after gotoLine to draw the eye.
+    var flashEffect = CM6.StateEffect.define();
+    var flashClear = CM6.StateEffect.define();
+    var flashDeco = CM6.Decoration.line({ class: "cm-goto-flash" });
+    var flashField = CM6.StateField.define({
+        create: function () { return CM6.Decoration.none; },
+        update: function (value, tr) {
+            for (var i = 0; i < tr.effects.length; i++) {
+                if (tr.effects[i].is(flashEffect)) {
+                    var line = tr.state.doc.lineAt(tr.effects[i].value);
+                    return CM6.Decoration.set([flashDeco.range(line.from)]);
+                }
+                if (tr.effects[i].is(flashClear)) {
+                    return CM6.Decoration.none;
+                }
+            }
+            return value;
+        },
+        provide: function (f) { return CM6.EditorView.decorations.from(f); }
+    });
+
     /**
      * Convert a CM6 offset to a 0-indexed {row, column} position.
      */
@@ -43,6 +65,11 @@
         view.dispatch({
             effects: CM6.EditorView.scrollIntoView(offset, { y: "center" })
         });
+        // Flash the target line
+        view.dispatch({ effects: flashEffect.of(offset) });
+        setTimeout(function () {
+            view.dispatch({ effects: flashClear.of(null) });
+        }, 1200);
         view.focus();
     }
 
@@ -131,6 +158,7 @@
         textToScreenCoordinates: textToScreenCoordinates,
         setAnnotations: setAnnotations,
         getAnnotations: getAnnotations,
-        clearAnnotations: clearAnnotations
+        clearAnnotations: clearAnnotations,
+        flashField: flashField
     };
 })();
