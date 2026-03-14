@@ -494,8 +494,20 @@ eXide.edit.XQueryModeHelper = (function () {
         .then(function (response) { return response.json(); })
         .then(function (data) {
             if (data && data.line !== undefined) {
-                // Server returns 0-based line; gotoLine expects 1-based
-                editorUtils.gotoLine(self.editor, data.line + 1, data.column, true);
+                if (data.uri) {
+                    // Cross-module definition: open the target module
+                    var targetPath = data.uri;
+                    var resource = {
+                        path: targetPath,
+                        name: targetPath.replace(/^.*\//, ""),
+                        writable: true,
+                        line: data.line + 1  // gotoLine expects 1-based
+                    };
+                    self.parent.$doOpenDocument(resource);
+                } else {
+                    // Same-file definition: jump to the line
+                    editorUtils.gotoLine(self.editor, data.line + 1, data.column, true);
+                }
             } else {
                 // Fall back to AST-based local definition lookup
                 self.parseXQuery(doc);

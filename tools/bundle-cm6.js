@@ -22,7 +22,8 @@ import {syntaxHighlighting, HighlightStyle, indentOnInput, foldGutter, foldKeyma
 import {defaultKeymap, history, historyKeymap, indentWithTab, undo, redo, toggleComment} from "@codemirror/commands";
 import {searchKeymap, openSearchPanel, closeSearchPanel, search, findNext, findPrevious,
         replaceNext, replaceAll, SearchQuery, setSearchQuery, getSearchQuery,
-        SearchCursor} from "@codemirror/search";
+        SearchCursor, highlightSelectionMatches, selectNextOccurrence} from "@codemirror/search";
+import {placeholder} from "@codemirror/view";
 import {autocompletion, completionKeymap, CompletionContext, startCompletion,
         acceptCompletion, closeCompletion, snippet, snippetCompletion,
         closeBrackets, closeBracketsKeymap} from "@codemirror/autocomplete";
@@ -114,6 +115,9 @@ globalThis.CM6 = {
     setSearchQuery,
     getSearchQuery,
     SearchCursor,
+    highlightSelectionMatches,
+    selectNextOccurrence,
+    placeholder,
 
     // @codemirror/autocomplete
     autocompletion,

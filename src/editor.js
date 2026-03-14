@@ -252,6 +252,7 @@ eXide.edit.Editor = (function () {
             CM6.history(),
             CM6.foldGutter(),
             CM6.bracketMatching(),
+            CM6.highlightSelectionMatches({ highlightWordAroundCursor: true }),
             autoPairCompartment.of([CM6.closeBrackets(), keymap.of(CM6.closeBracketsKeymap)]),
             CM6.indentOnInput(),
             CM6.syntaxHighlighting(CM6.defaultHighlightStyle, { fallback: true }),
@@ -326,6 +327,26 @@ eXide.edit.Editor = (function () {
                     var el = document.getElementById("status-cursor");
                     if (el) {
                         el.textContent = "Ln " + line.number + ", Col " + col;
+                    }
+                    // Update scope breadcrumb for XQuery
+                    var scopeEl = document.getElementById("status-scope");
+                    var scopeSep = document.getElementById("status-scope-sep");
+                    if (scopeEl && $this.activeDoc && $this.activeDoc.ast &&
+                        $this.activeDoc.getSyntax() === "xquery") {
+                        var pos = { line: line.number - 1, col: col - 1 };
+                        var node = eXide.edit.XQueryUtils.findNode($this.activeDoc.ast, pos);
+                        if (node) {
+                            var path = eXide.edit.XQueryUtils.getPath(node);
+                            scopeEl.textContent = path;
+                            scopeEl.style.display = "";
+                            scopeSep.style.display = "";
+                        } else {
+                            scopeEl.style.display = "none";
+                            scopeSep.style.display = "none";
+                        }
+                    } else if (scopeEl) {
+                        scopeEl.style.display = "none";
+                        scopeSep.style.display = "none";
                     }
                 }
             })
