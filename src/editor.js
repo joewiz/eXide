@@ -226,7 +226,7 @@ eXide.edit.Editor = (function () {
             case "less":
                 return CM6.css(); // Less uses CSS mode
             case "json":
-                return CM6.json();
+                return [CM6.json(), CM6.jsonParseLinter ? CM6.linter(CM6.jsonParseLinter()) : []];
             case "markdown":
                 return CM6.markdown();
             default:
@@ -273,7 +273,7 @@ eXide.edit.Editor = (function () {
             eXide.edit.SemanticHighlight.extension(),
             CM6.autocompletion({
                 override: [eXide.edit.CompletionSource.completionSource],
-                activateOnTyping: false,
+                activateOnTyping: true,
                 maxRenderedOptions: 50,
                 icons: true
             }),

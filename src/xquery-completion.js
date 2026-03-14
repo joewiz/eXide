@@ -56,6 +56,16 @@ eXide.edit.CompletionSource = (function () {
         if (syntax === "xquery" && helper && helper.parseXQuery) {
             return xqueryCompletion(context, doc, helper);
         }
+        // Delegate to CM6's native completion sources for supported modes
+        if (syntax === "html" && CM6.htmlCompletionSource) {
+            return CM6.htmlCompletionSource(context);
+        }
+        if ((syntax === "css" || syntax === "less") && CM6.cssCompletionSource) {
+            return CM6.cssCompletionSource(context);
+        }
+        if ((syntax === "javascript" || syntax === "json") && CM6.localCompletionSource) {
+            return CM6.localCompletionSource(context);
+        }
         // Other modes: template snippets only
         return templateCompletion(context, doc, helper);
     }

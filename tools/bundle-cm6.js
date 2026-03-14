@@ -17,7 +17,7 @@ import {EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLin
         showTooltip, tooltips, hoverTooltip} from "@codemirror/view";
 import {syntaxHighlighting, HighlightStyle, indentOnInput, foldGutter, foldKeymap,
         bracketMatching, defaultHighlightStyle, indentUnit, StreamLanguage,
-        syntaxTree, foldNodeProp, foldInside, Language, LRLanguage,
+        syntaxTree, ensureSyntaxTree, foldNodeProp, foldInside, Language, LRLanguage,
         LanguageSupport, LanguageDescription} from "@codemirror/language";
 import {defaultKeymap, history, historyKeymap, indentWithTab, undo, redo, toggleComment} from "@codemirror/commands";
 import {searchKeymap, openSearchPanel, closeSearchPanel, search, findNext, findPrevious,
@@ -30,11 +30,11 @@ import {lintKeymap, setDiagnostics, forEachDiagnostic, linter, lintGutter,
         openLintPanel, closeLintPanel} from "@codemirror/lint";
 import {StreamLanguage as LegacyStreamLanguage} from "@codemirror/language";
 import * as legacyModes from "@codemirror/legacy-modes/mode/xquery";
-import {javascript} from "@codemirror/lang-javascript";
-import {css} from "@codemirror/lang-css";
-import {html} from "@codemirror/lang-html";
+import {javascript, localCompletionSource, snippets as jsSnippets} from "@codemirror/lang-javascript";
+import {css, cssCompletionSource} from "@codemirror/lang-css";
+import {html, htmlCompletionSource, autoCloseTags as htmlAutoCloseTags} from "@codemirror/lang-html";
 import {xml} from "@codemirror/lang-xml";
-import {json} from "@codemirror/lang-json";
+import {json, jsonParseLinter} from "@codemirror/lang-json";
 import {markdown} from "@codemirror/lang-markdown";
 import {oneDark, oneDarkTheme, oneDarkHighlightStyle} from "@codemirror/theme-one-dark";
 import {languages} from "@codemirror/language-data";
@@ -84,6 +84,7 @@ globalThis.CM6 = {
     indentUnit,
     StreamLanguage,
     syntaxTree,
+    ensureSyntaxTree,
     foldNodeProp,
     foldInside,
     Language,
@@ -149,6 +150,13 @@ globalThis.CM6 = {
     json,
     markdown,
     languages,
+
+    // Language-specific completion sources & linting
+    htmlCompletionSource,
+    cssCompletionSource,
+    localCompletionSource: localCompletionSource,
+    jsSnippets,
+    jsonParseLinter,
 
     // Themes
     oneDark,

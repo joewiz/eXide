@@ -82,8 +82,8 @@ eXide.edit.LessModeHelper = (function () {
     Constr.prototype.saveCSS = saveCSS;
 
     Constr.prototype.createOutline = function(doc, onComplete) {
-        var tree = CM6.syntaxTree(this.editor.state);
         var state = this.editor.state;
+        var tree = CM6.ensureSyntaxTree(state, state.doc.length, 5000) || CM6.syntaxTree(state);
         tree.iterate({
             enter: function(node) {
                 if (node.name === "RuleSet") {

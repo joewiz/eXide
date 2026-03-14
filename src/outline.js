@@ -60,12 +60,6 @@ eXide.edit.Outline = (function () {
         }
     };
 
-    function indentPrefix(level) {
-        var s = "";
-        for (var i = 0; i < level; i++) s += "\u00A0\u00A0";
-        return s;
-    }
-
     function docOrderSort(a, b) {
         var ra = a.row !== undefined ? a.row : 999999;
         var rb = b.row !== undefined ? b.row : 999999;
@@ -76,6 +70,86 @@ eXide.edit.Outline = (function () {
         var na = (a.name || "").toLowerCase();
         var nb = (b.name || "").toLowerCase();
         return na > nb ? 1 : na < nb ? -1 : 0;
+    }
+
+    /**
+     * Create the <a> element for an outline item with click handler.
+     */
+    function makeLink(d) {
+        var a = document.createElement("a");
+        if (d.signature) a.title = d.signature;
+        a.href = "#" + (d.source ? d.source : "");
+
+        var text = d.type == eXide.edit.Document.TYPE_VARIABLE ? "$" + d.name : d.name;
+        var nameSpan = document.createElement("span");
+        nameSpan.className = "outline-name";
+        nameSpan.textContent = text;
+        a.appendChild(nameSpan);
+
+        if (d.hint) {
+            var hintSpan = document.createElement("span");
+            hintSpan.className = "outline-hint";
+            hintSpan.textContent = " \u201C" + d.hint + "\u201D";
+            a.appendChild(hintSpan);
+        }
+
+        a.addEventListener("click", function(e) {
+            e.preventDefault();
+            var path = this.hash.substring(1);
+            if (d.from !== undefined && d.to !== undefined) {
+                var ed = eXide.app.getEditor();
+                if (ed && ed.editor) {
+                    ed.editor.dispatch({
+                        selection: { anchor: d.to, head: d.from }
+                    });
+                    ed.editor.dispatch({
+                        effects: CM6.EditorView.scrollIntoView(d.from, { y: "center" })
+                    });
+                    ed.editor.focus();
+                }
+            } else if(d.row !== undefined && d.row !== null) {
+                var ed = eXide.app.getEditor();
+                if (ed && ed.editor) {
+                    editorUtils.gotoLine(ed.editor, d.row + 1, d.column || 0, true);
+                }
+            } else if(d.type == eXide.edit.Document.TYPE_FUNCTION) {
+                eXide.app.locate("function", path == '' ? null: path, d.name);
+            } else {
+                eXide.app.locate("variable", path == '' ? null: path, d.name);
+            }
+        });
+
+        a.style.opacity = "0";
+        requestAnimationFrame(function() {
+            a.style.transition = "opacity 0.4s";
+            a.style.opacity = "1";
+        });
+
+        return a;
+    }
+
+    /**
+     * Create a <li> element with the appropriate CSS classes.
+     */
+    function makeLi(d) {
+        var li = document.createElement("li");
+        var cl = d.type == eXide.edit.Document.TYPE_FUNCTION ? "t_function" : "t_variable";
+        if (d.visibility === "private") cl += " private";
+        else if (d.visibility === "public") cl += " public";
+        if (d.outlineClass) cl += " " + d.outlineClass;
+        li.className = cl;
+        li.appendChild(makeLink(d));
+        return li;
+    }
+
+    /**
+     * Check whether any items have indent > 0 (i.e. the data is hierarchical).
+     */
+    function hasHierarchy(items) {
+        for (var i = 0; i < items.length; i++) {
+            if (items[i].indent > 0) return true;
+        }
+        return false;
     }
 
     Constr.prototype = {
@@ -135,8 +209,14 @@ eXide.edit.Outline = (function () {
 
             var helper = doc.getModeHelper();
             if (helper != null && this.__activated) {
-                helper.createOutline(doc, function() {
-                    self.$outlineUpdate(doc);
+                // Defer to let CM6 process language reconfiguration before
+                // walking the syntax tree (Lezer parses asynchronously)
+                requestAnimationFrame(function() {
+                    if (self.currentDoc !== doc) return;
+                    doc.functions = [];
+                    helper.createOutline(doc, function() {
+                        self.$outlineUpdate(doc);
+                    });
                 });
             }
         },
@@ -151,7 +231,7 @@ eXide.edit.Outline = (function () {
             var links = document.querySelectorAll("#outline li a");
             for (var i = 0; i < links.length; i++) {
                 var link = links[i];
-                link.style.display = regex.test(link.textContent) ? "" : "none";
+                link.parentNode.style.display = regex.test(link.textContent) ? "" : "none";
             }
         },
 
@@ -175,67 +255,55 @@ eXide.edit.Outline = (function () {
             var outline = document.getElementById("outline");
             outline.innerHTML = "";
 
+            // Use nested <ul> tree when in nested mode and data has hierarchy
+            if (nested && hasHierarchy(items)) {
+                this.$renderNested(outline, items);
+            } else {
+                this.$renderFlat(outline, items);
+            }
+        },
+
+        /**
+         * Render a flat list of <li> elements (for flat modes or non-hierarchical data).
+         */
+        $renderFlat: function(outline, items) {
             items.forEach(function(d) {
-                var li = document.createElement("li");
-                var cl = d.type == eXide.edit.Document.TYPE_FUNCTION ? "t_function" : "t_variable";
-                if (d.visibility === "private") cl += " private";
-                else if (d.visibility === "public") cl += " public";
-                if (d.outlineClass) cl += " " + d.outlineClass;
-                li.className = cl;
+                outline.appendChild(makeLi(d));
+            });
+        },
 
-                var a = document.createElement("a");
-                if (d.signature) a.title = d.signature;
-                a.href = "#" + (d.source ? d.source : "");
+        /**
+         * Render a nested <ul> tree based on indent levels.
+         * Each item with children gets a child <ul> inside its <li>.
+         */
+        $renderNested: function(outline, items) {
+            // Stack tracks the current <ul> at each depth level
+            var stack = [outline];
+            var currentDepth = 0;
 
-                var text = d.type == eXide.edit.Document.TYPE_VARIABLE ? "$" + d.name : d.name;
-                if (nested && d.indent) {
-                    text = indentPrefix(d.indent) + text;
-                }
-                var nameSpan = document.createElement("span");
-                nameSpan.className = "outline-name";
-                nameSpan.textContent = text;
-                a.appendChild(nameSpan);
+            items.forEach(function(d) {
+                var depth = d.indent || 0;
 
-                if (d.hint) {
-                    var hintSpan = document.createElement("span");
-                    hintSpan.className = "outline-hint";
-                    hintSpan.textContent = " \u201C" + d.hint + "\u201D";
-                    a.appendChild(hintSpan);
-                }
-
-                a.addEventListener("click", function(e) {
-                    e.preventDefault();
-                    var path = this.hash.substring(1);
-                    if (d.from !== undefined && d.to !== undefined) {
-                        var ed = eXide.app.getEditor();
-                        if (ed && ed.editor) {
-                            ed.editor.dispatch({
-                                selection: { anchor: d.from, head: d.to },
-                                scrollIntoView: true
-                            });
-                            ed.editor.focus();
-                        }
-                    } else if(d.row !== undefined && d.row !== null) {
-                        var ed = eXide.app.getEditor();
-                        if (ed && ed.editor) {
-                            editorUtils.gotoLine(ed.editor, d.row + 1, d.column || 0, true);
-                        }
-                    } else if(d.type == eXide.edit.Document.TYPE_FUNCTION) {
-                        eXide.app.locate("function", path == '' ? null: path, d.name);
+                // Go deeper: open new <ul> inside the last <li>
+                while (currentDepth < depth) {
+                    var ul = document.createElement("ul");
+                    var parentLi = stack[stack.length - 1].lastElementChild;
+                    if (parentLi) {
+                        parentLi.appendChild(ul);
                     } else {
-                        eXide.app.locate("variable", path == '' ? null: path, d.name);
+                        stack[stack.length - 1].appendChild(ul);
                     }
-                });
+                    stack.push(ul);
+                    currentDepth++;
+                }
 
-                a.style.opacity = "0";
-                li.appendChild(a);
-                outline.appendChild(li);
+                // Go shallower: pop back up the stack
+                while (currentDepth > depth && stack.length > 1) {
+                    stack.pop();
+                    currentDepth--;
+                }
 
-                // Fade in
-                requestAnimationFrame(function() {
-                    a.style.transition = "opacity 0.4s";
-                    a.style.opacity = "1";
-                });
+                stack[stack.length - 1].appendChild(makeLi(d));
             });
         }
     };
