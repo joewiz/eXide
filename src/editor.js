@@ -190,6 +190,8 @@ eXide.edit.Editor = (function () {
     var showInvisiblesCompartment = new Compartment();
     // Rectangular selection compartment
     var rectangularSelectionCompartment = new Compartment();
+    // Autocompletion compartment (for toggling activateOnTyping)
+    var autocompletionCompartment = new Compartment();
 
     function parseErrMsg(error) {
         var msg;
@@ -271,12 +273,12 @@ eXide.edit.Editor = (function () {
             eXide.edit.FuncDocTooltip.extension(),
             eXide.edit.LspHover.extension(),
             eXide.edit.SemanticHighlight.extension(),
-            CM6.autocompletion({
+            autocompletionCompartment.of(CM6.autocompletion({
                 override: [eXide.edit.CompletionSource.completionSource],
                 activateOnTyping: true,
                 maxRenderedOptions: 50,
                 icons: true
-            }),
+            })),
             CM6.scrollPastEnd(),
             EditorView.updateListener.of(function(update) {
                 if (update.docChanged && $this.activeDoc && !$this._switching) {
@@ -343,6 +345,7 @@ eXide.edit.Editor = (function () {
         this._lineWrappingCompartment = lineWrappingCompartment;
         this._showInvisiblesCompartment = showInvisiblesCompartment;
         this._rectangularSelectionCompartment = rectangularSelectionCompartment;
+        this._autocompletionCompartment = autocompletionCompartment;
         this._baseExtensions = buildExtensions;
 
         // register keybindings

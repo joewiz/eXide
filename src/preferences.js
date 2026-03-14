@@ -30,6 +30,7 @@ eXide.util.Preferences = (function () {
         font: "Default",
 		showInvisibles: false,
         autoPair: true,
+        autocompleteOnType: true,
 		showPrintMargin: true,
 		showHScroll: false,
         indent: -1,
@@ -123,6 +124,7 @@ eXide.util.Preferences = (function () {
 		form.querySelector('input[name="omit-xml-decl-on-download-package"]').checked = this.preferences.omitXMLDeclarationOnDownloadPackage;
 		form.querySelector('input[name="show-invisibles"]').checked = this.preferences.showInvisibles;
         form.querySelector('input[name="auto-pair"]').checked = this.preferences.autoPair;
+        form.querySelector('input[name="autocomplete-on-type"]').checked = this.preferences.autocompleteOnType !== false;
 		form.querySelector('input[name="print-margin"]').checked = this.preferences.showPrintMargin;
 		form.querySelector('input[name="emmet"]').checked = this.preferences.emmet;
 		form.querySelector('input[name="split-pane"]').checked = this.preferences.splitPane;
@@ -181,6 +183,7 @@ eXide.util.Preferences = (function () {
         this.preferences.font = form.querySelector('select[name="font"]').value;
 		this.preferences.showInvisibles = form.querySelector('input[name="show-invisibles"]').checked;
         this.preferences.autoPair = form.querySelector('input[name="auto-pair"]').checked;
+        this.preferences.autocompleteOnType = form.querySelector('input[name="autocomplete-on-type"]').checked;
 		this.preferences.showPrintMargin = form.querySelector('input[name="print-margin"]').checked;
 		this.preferences.emmet = form.querySelector('input[name="emmet"]').checked;
 		this.preferences.splitPane = form.querySelector('input[name="split-pane"]').checked;
@@ -311,6 +314,18 @@ eXide.util.Preferences = (function () {
                 var inv = this.preferences.showInvisibles;
                 effects.push(this.editor._showInvisiblesCompartment.reconfigure(
                     inv ? [CM6.highlightWhitespace(), CM6.highlightTrailingWhitespace()] : []
+                ));
+            }
+
+            // Autocomplete on typing
+            if (this.editor._autocompletionCompartment) {
+                effects.push(this.editor._autocompletionCompartment.reconfigure(
+                    CM6.autocompletion({
+                        override: [eXide.edit.CompletionSource.completionSource],
+                        activateOnTyping: this.preferences.autocompleteOnType !== false,
+                        maxRenderedOptions: 50,
+                        icons: true
+                    })
                 ));
             }
 

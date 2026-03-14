@@ -769,7 +769,7 @@
                                 <li>
                                     <label for="pref-font">Font:</label>
                                     <select name="font" id="pref-font">
-                                        <option value="&#34;Ubuntu Mono&#34;,Monaco,Menlo,&#34;Droid Sans Mono&#34;,&#34;Courier New&#34;">Default</option>
+                                        <option value="Default">Default</option>
                                         <option value="&#34;Andale Mono&#34;">Andale Mono</option>
                                         <option>Consolas</option>
                                         <option value="&#34;Droid Sans Mono&#34;">Droid Sans Mono</option>
@@ -838,6 +838,10 @@
                                     <input type="checkbox" name="auto-pair" id="pref-auto-pair"/>
                                 </li>
                                 <li>
+                                    <label for="pref-autocomplete-on-type">Autocomplete as you type:</label>
+                                    <input type="checkbox" name="autocomplete-on-type" id="pref-autocomplete-on-type"/>
+                                </li>
+                                <li>
                                     <label for="pref-emmet">Enable emmet (HTML):</label>
                                     <input type="checkbox" name="emmet" id="pref-emmet"/>
                                 </li>
@@ -863,7 +867,7 @@
                             </ol>
                             <p>Tab width and tab/space mode use the editor settings above.
                                 Format code with Edit &gt; Reformat (or the keyboard shortcut).</p>
-                            <legend>XML / HTML Options</legend>
+                            <h4 class="pref-subsection">XML / HTML Options</h4>
                             <ol>
                                 <li>
                                     <label for="pref-prettier-xml-ws">Whitespace sensitivity:</label>
@@ -898,7 +902,7 @@
                                     <input type="checkbox" name="prettier-bracket-same-line" id="pref-prettier-bracket-same-line"/>
                                 </li>
                             </ol>
-                            <legend>JavaScript Options</legend>
+                            <h4 class="pref-subsection">JavaScript Options</h4>
                             <ol>
                                 <li>
                                     <label for="pref-prettier-bracket-spacing">Bracket spacing:</label>
@@ -924,7 +928,7 @@
                                     </select>
                                 </li>
                             </ol>
-                            <legend>HTML Options</legend>
+                            <h4 class="pref-subsection">HTML Options</h4>
                             <ol>
                                 <li>
                                     <label for="pref-prettier-html-ws">Whitespace sensitivity:</label>
@@ -935,7 +939,7 @@
                                     </select>
                                 </li>
                             </ol>
-                            <legend>Markdown Options</legend>
+                            <h4 class="pref-subsection">Markdown Options</h4>
                             <ol>
                                 <li>
                                     <label for="pref-prettier-prose-wrap">Prose wrap:</label>
