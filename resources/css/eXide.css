@@ -585,6 +585,29 @@ a:link, a:visited {
     background: #3182ce;
 }
 
+/* Override CM6's default green bracket matching for a subtler look */
+.cm-matchingBracket {
+    background: rgba(43, 108, 176, 0.12) !important;
+    outline: 1px solid rgba(43, 108, 176, 0.3);
+}
+
+body.dark .cm-matchingBracket {
+    background: rgba(99, 179, 237, 0.12) !important;
+    outline-color: rgba(99, 179, 237, 0.3);
+}
+
+/* Matching tag highlight for XML/HTML */
+.cm-matchingTag {
+    background: rgba(43, 108, 176, 0.12) !important;
+    border-bottom: 1.5px solid rgba(43, 108, 176, 0.4) !important;
+    border-radius: 2px;
+}
+
+body.dark .cm-matchingTag {
+    background: rgba(99, 179, 237, 0.12) !important;
+    border-bottom-color: rgba(99, 179, 237, 0.4) !important;
+}
+
 /* Selection match: highlight all occurrences of selected text */
 .cm-selectionMatch {
     background: rgba(255, 213, 79, 0.3);

@@ -274,6 +274,7 @@ eXide.edit.Editor = (function () {
             rectangularSelectionCompartment.of([CM6.rectangularSelection(), CM6.crosshairCursor()]),
             eXide.edit.FuncDocTooltip.extension(),
             eXide.edit.LspHover.extension(),
+            eXide.edit.TagMatching.extension(),
             eXide.edit.SemanticHighlight.extension(),
             autocompletionCompartment.of(CM6.autocompletion({
                 override: [eXide.edit.CompletionSource.completionSource],
@@ -328,25 +329,63 @@ eXide.edit.Editor = (function () {
                     if (el) {
                         el.textContent = "Ln " + line.number + ", Col " + col;
                     }
-                    // Update scope breadcrumb for XQuery
+                    // Update scope breadcrumb
                     var scopeEl = document.getElementById("status-scope");
                     var scopeSep = document.getElementById("status-scope-sep");
-                    if (scopeEl && $this.activeDoc && $this.activeDoc.ast &&
-                        $this.activeDoc.getSyntax() === "xquery") {
-                        var pos = { line: line.number - 1, col: col - 1 };
-                        var node = eXide.edit.XQueryUtils.findNode($this.activeDoc.ast, pos);
-                        if (node) {
-                            var path = eXide.edit.XQueryUtils.getPath(node);
-                            scopeEl.textContent = path;
+                    if (scopeEl && $this.activeDoc) {
+                        var syntax = $this.activeDoc.getSyntax();
+                        var scopePath = null;
+
+                        if (syntax === "xquery" && $this.activeDoc.ast) {
+                            var pos = { line: line.number - 1, col: col - 1 };
+                            var node = eXide.edit.XQueryUtils.findNode($this.activeDoc.ast, pos);
+                            if (node) {
+                                scopePath = eXide.edit.XQueryUtils.getPath(node);
+                            }
+                        } else if (syntax === "xml" || syntax === "html") {
+                            // Walk CM6 syntax tree to build XPath at cursor
+                            var tree = CM6.syntaxTree(update.state);
+                            var treeNode = tree.resolveInner(head, -1);
+                            var steps = [];
+                            var cur = treeNode;
+                            while (cur) {
+                                if (cur.name === "Element" || cur.name === "SelfClosingTag") {
+                                    // Find TagName child
+                                    var child = cur.firstChild;
+                                    while (child) {
+                                        if (child.name === "TagName") {
+                                            steps.unshift(update.state.sliceDoc(child.from, child.to));
+                                            break;
+                                        }
+                                        if (child.name === "OpenTag" || child.name === "SelfClosingTag") {
+                                            var gc = child.firstChild;
+                                            while (gc) {
+                                                if (gc.name === "TagName") {
+                                                    steps.unshift(update.state.sliceDoc(gc.from, gc.to));
+                                                    break;
+                                                }
+                                                gc = gc.nextSibling;
+                                            }
+                                            break;
+                                        }
+                                        child = child.nextSibling;
+                                    }
+                                }
+                                cur = cur.parent;
+                            }
+                            if (steps.length > 0) {
+                                scopePath = "/" + steps.join("/");
+                            }
+                        }
+
+                        if (scopePath) {
+                            scopeEl.textContent = scopePath;
                             scopeEl.style.display = "";
                             scopeSep.style.display = "";
                         } else {
                             scopeEl.style.display = "none";
                             scopeSep.style.display = "none";
                         }
-                    } else if (scopeEl) {
-                        scopeEl.style.display = "none";
-                        scopeSep.style.display = "none";
                     }
                 }
             })
