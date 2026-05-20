@@ -1,0 +1,36 @@
+{
+  "printWidth": 100,
+  "tabWidth": 2,
+  "useTabs": false,
+  "singleQuote": false,
+  "trailingComma": "es5",
+  "semi": true,
+  "plugins": ["@prettier/plugin-xml", "prettier-plugin-xquery"],
+  "overrides": [
+    {
+      "files": ["*.xml", "*.xsd", "*.xconf", "*.rng", "*.xsl", "*.xslt", "*.tmpl", "*.html"],
+      "options": {
+        "parser": "xml",
+        "tabWidth": 4,
+        "xmlWhitespaceSensitivity": "preserve",
+        "xmlSelfClosingSpace": false
+      }
+    },
+    {
+      "files": ["*.xq", "*.xqm", "*.xql", "*.xquery"],
+      "options": { "parser": "xquery", "tabWidth": 4 }
+    },
+    {
+      "files": ["*.md"],
+      "options": { "tabWidth": 2, "proseWrap": "preserve" }
+    },
+    {
+      "files": ["*.json", "*.jsonc"],
+      "options": { "tabWidth": 2 }
+    },
+    {
+      "files": ["*.yml", "*.yaml"],
+      "options": { "tabWidth": 2 }
+    }
+  ]
+}
