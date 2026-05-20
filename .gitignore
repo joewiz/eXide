@@ -32,3 +32,5 @@ CLAUDE.md
 !.gitattributes
 !.prettierrc.json
 !.prettierignore
+!.husky
+.husky/_

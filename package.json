@@ -18,7 +18,12 @@
     "generate-parsers": "npm run generate-parser && npm run generate-parser-40",
     "cypress": "cypress run",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{js,css,json,yaml,yml,md}": "prettier --write",
+    "*.{xq,xqm,xml,xsd,html,tmpl,xconf,svg}": "prettier --write"
   },
   "repository": {
     "type": "git",
@@ -41,6 +46,8 @@
     "cypress": "^15.15.0",
     "esbuild": "^0.28.0",
     "glob-stream": "^7.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.5",
     "micro-fs": "^1.0.3",
     "request": "^2.88.2",
     "ws": "^8.20.0"
