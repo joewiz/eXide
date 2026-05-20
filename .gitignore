@@ -28,3 +28,9 @@ CLAUDE.md
 !.existdb.json
 !.gitmodules
 !.github
+!.editorconfig
+!.gitattributes
+!.prettierrc.json
+!.prettierignore
+!.husky
+.husky/_

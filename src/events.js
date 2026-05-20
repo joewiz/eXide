@@ -1,6 +1,6 @@
 /*
  *  eXide - web-based XQuery IDE
- *  
+ *
  *  Copyright (C) 2011 Wolfgang Meier
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -22,55 +22,52 @@ eXide.namespace("eXide.events.Sender");
 /**
  * Interface for sending events, registering listeners.
  */
-eXide.events.Sender = (function() {
+eXide.events.Sender = (function () {
+  Constr = function () {};
 
-    Constr = function() {
-    };
-    
-    Constr.prototype = {
-        
-        addEventListener: function (name, obj, callback) {
-            if (typeof obj == "function") {
-                callback = obj;
-                obj = null;
-            }
-            this.events = this.events || {};
-    		var event = this.events[name];
-            if (!event) {
-                event = new Array();
-                this.events[name] = event;
-            }
-			event.push({
-				obj: obj,
-				callback: callback
-			});
-		},
-        
-		$triggerEvent: function (name, args) {
-            this.events = this.events || {};
-			var event = this.events[name];
-			if (event) {
-				for (var i = 0; i < event.length; i++) {
-					event[i].callback.apply(event[i].obj, args);
-				}
-			}
-		},
-	removeEventListener:function(name, obj, callback){
-		if (typeof obj == "function") {
-	            callback = obj;
-	            obj = null;
-	        }
-		var events = this.events || {};
-		var event = events[name];
-		if (event) {
-			var i = 0;
-			for (; i < event.length; i++) {
-				if(event[i].obj===obj && event[i].callback===callback) break;
-			}
-			if(i<event.length) this.events[name].splice(i,1);
-		}
-	}
-    };
-    
-    return Constr;
-}());
+  Constr.prototype = {
+    addEventListener: function (name, obj, callback) {
+      if (typeof obj == "function") {
+        callback = obj;
+        obj = null;
+      }
+      this.events = this.events || {};
+      var event = this.events[name];
+      if (!event) {
+        event = new Array();
+        this.events[name] = event;
+      }
+      event.push({
+        obj: obj,
+        callback: callback,
+      });
+    },
+
+    $triggerEvent: function (name, args) {
+      this.events = this.events || {};
+      var event = this.events[name];
+      if (event) {
+        for (var i = 0; i < event.length; i++) {
+          event[i].callback.apply(event[i].obj, args);
+        }
+      }
+    },
+    removeEventListener: function (name, obj, callback) {
+      if (typeof obj == "function") {
+        callback = obj;
+        obj = null;
+      }
+      var events = this.events || {};
+      var event = events[name];
+      if (event) {
+        var i = 0;
+        for (; i < event.length; i++) {
+          if (event[i].obj === obj && event[i].callback === callback) break;
+        }
+        if (i < event.length) this.events[name].splice(i, 1);
+      }
+    },
+  };
+
+  return Constr;
+})();

@@ -6,20 +6,20 @@ eXide uses a [REx](https://www.bottlecaps.de/rex/)-generated parser built from W
 
 ### Reference grammars (individual)
 
-| File | Description |
-|------|-------------|
-| `XQuery-31.ebnf` | Base XQuery 3.1 |
-| `XQuery-40.ebnf` | Base XQuery 4.0 (from REx repo) |
-| `XQuery-Update-30.ebnf` | W3C XQuery Update Facility 3.0 |
-| `XQuery-FullText-10.ebnf` | XQuery Full Text 1.0 |
+| File                              | Description                                 |
+| --------------------------------- | ------------------------------------------- |
+| `XQuery-31.ebnf`                  | Base XQuery 3.1                             |
+| `XQuery-40.ebnf`                  | Base XQuery 4.0 (from REx repo)             |
+| `XQuery-Update-30.ebnf`           | W3C XQuery Update Facility 3.0              |
+| `XQuery-FullText-10.ebnf`         | XQuery Full Text 1.0                        |
 | `XQuery-Update-eXist-Legacy.ebnf` | XQUFEL (eXist-db proprietary update syntax) |
 
 ### Combined grammars
 
-| File | Description |
-|------|-------------|
+| File                           | Description                                                              |
+| ------------------------------ | ------------------------------------------------------------------------ |
 | `XQuery-31-Family-XQUFEL.ebnf` | **Current parser source** — XQ 3.1 + Update 3.0 + Full Text 1.0 + XQUFEL |
-| `XQuery-40-Family-XQUFEL.ebnf` | Future upgrade — XQ 4.0 + Update 3.0 + Full Text 1.0 + XQUFEL |
+| `XQuery-40-Family-XQUFEL.ebnf` | Future upgrade — XQ 4.0 + Update 3.0 + Full Text 1.0 + XQUFEL            |
 
 The "Family" grammars are created by merging the individual grammars. See [Merging Extension Grammars](#merging-extension-grammars) below.
 
@@ -47,13 +47,13 @@ eXide uses REx in **LL(3) mode** with these flags:
 -ll 3 -backtrack -tree -javascript -name XQueryParser
 ```
 
-| Flag | Purpose |
-|------|---------|
-| `-ll 3` | LL parser with lookahead depth 3 |
-| `-backtrack` | Enable backtracking for ambiguous constructs in the XQuery grammar |
-| `-tree` | Generate `TopDownTreeBuilder` for AST access |
-| `-javascript` | JavaScript output |
-| `-name XQueryParser` | Constructor/class name |
+| Flag                 | Purpose                                                            |
+| -------------------- | ------------------------------------------------------------------ |
+| `-ll 3`              | LL parser with lookahead depth 3                                   |
+| `-backtrack`         | Enable backtracking for ambiguous constructs in the XQuery grammar |
+| `-tree`              | Generate `TopDownTreeBuilder` for AST access                       |
+| `-javascript`        | JavaScript output                                                  |
+| `-name XQueryParser` | Constructor/class name                                             |
 
 **Why LL mode?** The `-tree` flag (TopDownTreeBuilder) requires LL mode, and LL parsers produce top-down parse trees that map directly to eXide's expected AST node shape.
 

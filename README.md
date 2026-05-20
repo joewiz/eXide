@@ -4,18 +4,18 @@
 
 # eXide - a web-based XQuery IDE
 
-eXide is a web-based XQuery IDE built around [CodeMirror 6](https://codemirror.net/). It is tightly integrated with the [eXist-db native XML database](https://exist-db.org). 
+eXide is a web-based XQuery IDE built around [CodeMirror 6](https://codemirror.net/). It is tightly integrated with the [eXist-db native XML database](https://exist-db.org).
 
 ## Features
 
-*   XQuery function and variable completion (press Ctrl-Space or Opt-Space)
-*   Outline view showing all functions and variables reachable from the current file
-*   Powerful navigation (press F3 on a function call to see its declaration)
-*   Templates and snippets
-*   Background syntax checks for XQuery and XML
-*   Database manager
-*   Support for EXPath application packages: scaffolding, deployment...
-*   And more ...
+- XQuery function and variable completion (press Ctrl-Space or Opt-Space)
+- Outline view showing all functions and variables reachable from the current file
+- Powerful navigation (press F3 on a function call to see its declaration)
+- Templates and snippets
+- Background syntax checks for XQuery and XML
+- Database manager
+- Support for EXPath application packages: scaffolding, deployment...
+- And more ...
 
 eXide consists of two parts:
 
@@ -24,12 +24,12 @@ eXide consists of two parts:
 
 ## Note concerning eXide 3.0.0
 
-eXide 3.0.0 removes the *app generation* feature as it was generating outdated code with potential security risks. We recommend the much better yeoman-based [generator-exist](https://github.com/eXist-db/generator-exist) for eXist-db.
+eXide 3.0.0 removes the _app generation_ feature as it was generating outdated code with potential security risks. We recommend the much better yeoman-based [generator-exist](https://github.com/eXist-db/generator-exist) for eXist-db.
 
 ## Documentation
 
-* [short documentation of all features](./docs/docs.md)
-* [screencast](https://youtu.be/U7Cd9h6UPoc) demonstrating most features
+- [short documentation of all features](./docs/docs.md)
+- [screencast](https://youtu.be/U7Cd9h6UPoc) demonstrating most features
 
 ## Dependencies
 
@@ -39,9 +39,9 @@ Running tests requires [npm](https://www.npmjs.com/) and [node.js](https://nodej
 
 ## Getting eXide
 
-eXide is included in eXist-db distributions and can be opened directly at `http://localhost:8080/exist/apps/eXide`. It can also be opened via the Dashboard or the "Open eXide" entry in eXist-db's task or menu bar. 
+eXide is included in eXist-db distributions and can be opened directly at `http://localhost:8080/exist/apps/eXide`. It can also be opened via the Dashboard or the "Open eXide" entry in eXist-db's task or menu bar.
 
-You can upgrade to new releases of eXide via the Dashboard app's Package Manager. 
+You can upgrade to new releases of eXide via the Dashboard app's Package Manager.
 
 You can also build eXide from source and install it.
 
@@ -97,17 +97,17 @@ docker start exist-ci && sleep 30
 
 # by this time you should be able to visit http://localhost:8080 and get exist-db home page
 # run cypress tests
-npm run cypress # this runs the tests in console 
+npm run cypress # this runs the tests in console
 # or use to view the tests in a GUI environment
-#npm run cypress open 
+#npm run cypress open
 ```
 
 If successful, the test runner should report, "All specs passed!"
 
 ## Publishing
 
-eXist-db.org Community administrators publish eXide releases by uploading the eXide `.xar` file to the [public repo](https://exist-db.org/exist/apps/public-repo/index.html). 
+eXist-db.org Community administrators publish eXide releases by uploading the eXide `.xar` file to the [public repo](https://exist-db.org/exist/apps/public-repo/index.html).
 
-Releases are also published to the eXide GitHub repository's [Releases](https://github.com/eXist-db/eXide/releases) page. To do so, either use the Releases page or add a tag in the form: 'vX.X.X' to the repo (where `X` corresponds to the semantic version number of the new release). 
+Releases are also published to the eXide GitHub repository's [Releases](https://github.com/eXist-db/eXide/releases) page. To do so, either use the Releases page or add a tag in the form: 'vX.X.X' to the repo (where `X` corresponds to the semantic version number of the new release).
 
-If you need help with a release of eXide, post a note in the [eXist-db Community Slack](https://exist-db.slack.com). 
+If you need help with a release of eXide, post a note in the [eXist-db Community Slack](https://exist-db.slack.com).

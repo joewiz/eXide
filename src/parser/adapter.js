@@ -16,14 +16,37 @@
 
 // Nonterminals eligible for single-child collapse (from JSONParseTreeHandler)
 var COLLAPSE_LIST = [
-    "OrExpr", "AndExpr", "ComparisonExpr", "StringConcatExpr", "RangeExpr",
-    "UnionExpr", "IntersectExceptExpr", "InstanceofExpr", "TreatExpr", "CastableExpr",
-    "CastExpr", "UnaryExpr", "ValueExpr", "FTContainsExpr", "SimpleMapExpr", "PathExpr",
-    "RelativePathExpr", "PostfixExpr", "StepExpr",
-    "SourceExpr", "TargetExpr", "NewNameExpr",
-    "FTOr", "FTAnd", "FTMildNot", "FTUnaryNot", "FTPrimaryWithOptions", "FTSelection",
-    // XQ 4.0 additions (collapse when single-child)
-    "OtherwiseExpr", "PipelineExpr"
+  "OrExpr",
+  "AndExpr",
+  "ComparisonExpr",
+  "StringConcatExpr",
+  "RangeExpr",
+  "UnionExpr",
+  "IntersectExceptExpr",
+  "InstanceofExpr",
+  "TreatExpr",
+  "CastableExpr",
+  "CastExpr",
+  "UnaryExpr",
+  "ValueExpr",
+  "FTContainsExpr",
+  "SimpleMapExpr",
+  "PathExpr",
+  "RelativePathExpr",
+  "PostfixExpr",
+  "StepExpr",
+  "SourceExpr",
+  "TargetExpr",
+  "NewNameExpr",
+  "FTOr",
+  "FTAnd",
+  "FTMildNot",
+  "FTUnaryNot",
+  "FTPrimaryWithOptions",
+  "FTSelection",
+  // XQ 4.0 additions (collapse when single-child)
+  "OtherwiseExpr",
+  "PipelineExpr",
 ];
 
 /**
@@ -31,13 +54,13 @@ var COLLAPSE_LIST = [
  * lineOffsets[i] = character offset where line i begins (0-indexed lines).
  */
 function buildLineOffsets(input) {
-    var offsets = [0];
-    for (var i = 0; i < input.length; i++) {
-        if (input.charCodeAt(i) === 10) {
-            offsets.push(i + 1);
-        }
+  var offsets = [0];
+  for (var i = 0; i < input.length; i++) {
+    if (input.charCodeAt(i) === 10) {
+      offsets.push(i + 1);
     }
-    return offsets;
+  }
+  return offsets;
 }
 
 /**
@@ -45,17 +68,17 @@ function buildLineOffsets(input) {
  * Both line and col are 0-indexed.
  */
 function offsetToLineCol(offset, lineOffsets) {
-    var lo = 0;
-    var hi = lineOffsets.length - 1;
-    while (lo < hi) {
-        var mid = (lo + hi + 1) >> 1;
-        if (lineOffsets[mid] <= offset) {
-            lo = mid;
-        } else {
-            hi = mid - 1;
-        }
+  var lo = 0;
+  var hi = lineOffsets.length - 1;
+  while (lo < hi) {
+    var mid = (lo + hi + 1) >> 1;
+    if (lineOffsets[mid] <= offset) {
+      lo = mid;
+    } else {
+      hi = mid - 1;
     }
-    return { line: lo, col: offset - lineOffsets[lo] };
+  }
+  return { line: lo, col: offset - lineOffsets[lo] };
 }
 
 /**
@@ -63,11 +86,11 @@ function offsetToLineCol(offset, lineOffsets) {
  * ec = column after last char on last line of the value.
  */
 function computeTerminalPos(value, sl, sc) {
-    var lines = value.split("\n");
-    var el = sl + lines.length - 1;
-    var lastIdx = value.lastIndexOf("\n");
-    var ec = lastIdx === -1 ? sc + value.length : value.substring(lastIdx + 1).length;
-    return { sl: sl, sc: sc, el: el, ec: ec };
+  var lines = value.split("\n");
+  var el = sl + lines.length - 1;
+  var lastIdx = value.lastIndexOf("\n");
+  var ec = lastIdx === -1 ? sc + value.length : value.substring(lastIdx + 1).length;
+  return { sl: sl, sc: sc, el: el, ec: ec };
 }
 
 /**
@@ -75,38 +98,38 @@ function computeTerminalPos(value, sl, sc) {
  * Includes WS nodes to match JSONParseTreeHandler behavior.
  */
 function extractTree(handler, input) {
-    var stack = [];
-    var root = null;
+  var stack = [];
+  var root = null;
 
-    handler.serialize({
-        reset: function() {},
-        startNonterminal: function(name, begin) {
-            var node = { name: name, begin: begin, end: begin, children: [], isTerminal: false };
-            if (stack.length > 0) {
-                stack[stack.length - 1].children.push(node);
-            }
-            stack.push(node);
-            if (!root) root = node;
-        },
-        endNonterminal: function(name, end) {
-            stack[stack.length - 1].end = end;
-            stack.pop();
-        },
-        terminal: function(name, begin, end) {
-            var node = { name: name, begin: begin, end: end, isTerminal: true };
-            if (stack.length > 0) {
-                stack[stack.length - 1].children.push(node);
-            }
-        },
-        whitespace: function(begin, end) {
-            var node = { name: "WS", begin: begin, end: end, isTerminal: true };
-            if (stack.length > 0) {
-                stack[stack.length - 1].children.push(node);
-            }
-        }
-    });
+  handler.serialize({
+    reset: function () {},
+    startNonterminal: function (name, begin) {
+      var node = { name: name, begin: begin, end: begin, children: [], isTerminal: false };
+      if (stack.length > 0) {
+        stack[stack.length - 1].children.push(node);
+      }
+      stack.push(node);
+      if (!root) root = node;
+    },
+    endNonterminal: function (name, end) {
+      stack[stack.length - 1].end = end;
+      stack.pop();
+    },
+    terminal: function (name, begin, end) {
+      var node = { name: name, begin: begin, end: end, isTerminal: true };
+      if (stack.length > 0) {
+        stack[stack.length - 1].children.push(node);
+      }
+    },
+    whitespace: function (begin, end) {
+      var node = { name: "WS", begin: begin, end: end, isTerminal: true };
+      if (stack.length > 0) {
+        stack[stack.length - 1].children.push(node);
+      }
+    },
+  });
 
-    return root;
+  return root;
 }
 
 /**
@@ -114,226 +137,241 @@ function extractTree(handler, input) {
  * applying all JSONParseTreeHandler normalizations.
  */
 function convertNode(rexNode, input, lineOffsets) {
-    if (rexNode.isTerminal) {
-        return convertTerminal(rexNode, input, lineOffsets);
-    }
-    return convertNonterminal(rexNode, input, lineOffsets);
+  if (rexNode.isTerminal) {
+    return convertTerminal(rexNode, input, lineOffsets);
+  }
+  return convertNonterminal(rexNode, input, lineOffsets);
 }
 
 function convertTerminal(rexNode, input, lineOffsets) {
-    // Rename quoted terminal names to "TOKEN" (matching JSONParseTreeHandler line 141)
-    var name = rexNode.name;
-    if (name.length >= 2 && name.charAt(0) === "'" && name.charAt(name.length - 1) === "'") {
-        name = "TOKEN";
-    }
+  // Rename quoted terminal names to "TOKEN" (matching JSONParseTreeHandler line 141)
+  var name = rexNode.name;
+  if (name.length >= 2 && name.charAt(0) === "'" && name.charAt(name.length - 1) === "'") {
+    name = "TOKEN";
+  }
 
-    var value = input.substring(rexNode.begin, rexNode.end);
-    var start = offsetToLineCol(rexNode.begin, lineOffsets);
-    var pos = computeTerminalPos(value, start.line, start.col);
+  var value = input.substring(rexNode.begin, rexNode.end);
+  var start = offsetToLineCol(rexNode.begin, lineOffsets);
+  var pos = computeTerminalPos(value, start.line, start.col);
 
-    return {
-        name: name,
-        children: [],
-        value: value,
-        pos: pos,
-        getParent: null
-    };
+  return {
+    name: name,
+    children: [],
+    value: value,
+    pos: pos,
+    getParent: null,
+  };
 }
 
 function convertNonterminal(rexNode, input, lineOffsets) {
-    var node = {
-        name: rexNode.name,
-        children: [],
+  var node = {
+    name: rexNode.name,
+    children: [],
+    value: undefined,
+    pos: { sl: 0, sc: 0, el: 0, ec: 0 },
+    getParent: null,
+  };
+
+  // Convert children
+  for (var i = 0; i < rexNode.children.length; i++) {
+    var child = convertNode(rexNode.children[i], input, lineOffsets);
+    child.getParent = node;
+    node.children.push(child);
+  }
+
+  // Derive pos from first/last non-empty child (matching JSONParseTreeHandler popNode)
+  if (node.children.length > 0) {
+    var first = node.children[0];
+    var last = null;
+    for (var i = node.children.length - 1; i >= 0; i--) {
+      last = node.children[i];
+      if (last.pos.el !== 0 || last.pos.ec !== 0) {
+        break;
+      }
+    }
+    node.pos.sl = first.pos.sl;
+    node.pos.sc = first.pos.sc;
+    node.pos.el = last.pos.el;
+    node.pos.ec = last.pos.ec;
+  }
+
+  // Normalize FunctionName/FunctionEQName → EQName (matching JSONParseTreeHandler)
+  // XQ 4.0: UnreservedFunctionEQName/UnreservedFunctionQName/UnreservedQName → EQName
+  if (
+    node.name === "FunctionName" ||
+    node.name === "FunctionEQName" ||
+    node.name === "UnreservedFunctionEQName" ||
+    node.name === "UnreservedFunctionQName" ||
+    node.name === "UnreservedQName"
+  ) {
+    node.name = "EQName";
+  }
+
+  // XQ 4.0: ParamWithDefault → Param, ParamListWithDefaults → ParamList
+  if (node.name === "ParamWithDefault") {
+    node.name = "Param";
+  } else if (node.name === "ParamListWithDefaults") {
+    node.name = "ParamList";
+  }
+
+  // XQ 4.0: VarNameAndType contains ($ EQName TypeDeclaration?) — restructure to
+  // match 3.1's ($ VarName > EQName TypeDeclaration?) by wrapping EQName in VarName
+  // and renaming this node so it can be unwrapped into the parent
+  if (node.name === "VarNameAndType") {
+    var eqIdx = -1;
+    for (var i = 0; i < node.children.length; i++) {
+      if (node.children[i].name === "EQName") {
+        eqIdx = i;
+        break;
+      }
+    }
+    if (eqIdx !== -1) {
+      var eq = node.children[eqIdx];
+      var varNameNode = {
+        name: "VarName",
+        children: [eq],
         value: undefined,
-        pos: { sl: 0, sc: 0, el: 0, ec: 0 },
-        getParent: null
-    };
-
-    // Convert children
-    for (var i = 0; i < rexNode.children.length; i++) {
-        var child = convertNode(rexNode.children[i], input, lineOffsets);
-        child.getParent = node;
-        node.children.push(child);
+        pos: { sl: eq.pos.sl, sc: eq.pos.sc, el: eq.pos.el, ec: eq.pos.ec },
+        getParent: node,
+      };
+      eq.getParent = varNameNode;
+      node.children[eqIdx] = varNameNode;
     }
+    // Become transparent: rename to _VarNameAndType so parent unwrap finds it
+    node.name = "_VarNameAndType";
+  }
 
-    // Derive pos from first/last non-empty child (matching JSONParseTreeHandler popNode)
-    if (node.children.length > 0) {
-        var first = node.children[0];
-        var last = null;
-        for (var i = node.children.length - 1; i >= 0; i--) {
-            last = node.children[i];
-            if (last.pos.el !== 0 || last.pos.ec !== 0) {
-                break;
-            }
-        }
-        node.pos.sl = first.pos.sl;
-        node.pos.sc = first.pos.sc;
-        node.pos.el = last.pos.el;
-        node.pos.ec = last.pos.ec;
+  // XQ 4.0: Unwrap transparent wrapper nodes by promoting their children into this node.
+  // LetValueBinding (inside LetBinding), _VarNameAndType (inside bindings/params)
+  var UNWRAP_NAMES = [
+    "LetValueBinding",
+    "ForItemBinding",
+    "_VarNameAndType",
+    "PositionalArguments",
+  ];
+  var needsUnwrap = false;
+  for (var i = 0; i < node.children.length; i++) {
+    if (UNWRAP_NAMES.indexOf(node.children[i].name) !== -1) {
+      needsUnwrap = true;
+      break;
     }
-
-    // Normalize FunctionName/FunctionEQName → EQName (matching JSONParseTreeHandler)
-    // XQ 4.0: UnreservedFunctionEQName/UnreservedFunctionQName/UnreservedQName → EQName
-    if (node.name === "FunctionName" || node.name === "FunctionEQName"
-        || node.name === "UnreservedFunctionEQName" || node.name === "UnreservedFunctionQName"
-        || node.name === "UnreservedQName") {
-        node.name = "EQName";
-    }
-
-    // XQ 4.0: ParamWithDefault → Param, ParamListWithDefaults → ParamList
-    if (node.name === "ParamWithDefault") {
-        node.name = "Param";
-    } else if (node.name === "ParamListWithDefaults") {
-        node.name = "ParamList";
-    }
-
-    // XQ 4.0: VarNameAndType contains ($ EQName TypeDeclaration?) — restructure to
-    // match 3.1's ($ VarName > EQName TypeDeclaration?) by wrapping EQName in VarName
-    // and renaming this node so it can be unwrapped into the parent
-    if (node.name === "VarNameAndType") {
-        var eqIdx = -1;
-        for (var i = 0; i < node.children.length; i++) {
-            if (node.children[i].name === "EQName") { eqIdx = i; break; }
-        }
-        if (eqIdx !== -1) {
-            var eq = node.children[eqIdx];
-            var varNameNode = {
-                name: "VarName",
-                children: [eq],
-                value: undefined,
-                pos: { sl: eq.pos.sl, sc: eq.pos.sc, el: eq.pos.el, ec: eq.pos.ec },
-                getParent: node
-            };
-            eq.getParent = varNameNode;
-            node.children[eqIdx] = varNameNode;
-        }
-        // Become transparent: rename to _VarNameAndType so parent unwrap finds it
-        node.name = "_VarNameAndType";
-    }
-
-    // XQ 4.0: Unwrap transparent wrapper nodes by promoting their children into this node.
-    // LetValueBinding (inside LetBinding), _VarNameAndType (inside bindings/params)
-    var UNWRAP_NAMES = ["LetValueBinding", "ForItemBinding", "_VarNameAndType", "PositionalArguments"];
-    var needsUnwrap = false;
+  }
+  if (needsUnwrap) {
+    var newChildren = [];
     for (var i = 0; i < node.children.length; i++) {
-        if (UNWRAP_NAMES.indexOf(node.children[i].name) !== -1) { needsUnwrap = true; break; }
-    }
-    if (needsUnwrap) {
-        var newChildren = [];
-        for (var i = 0; i < node.children.length; i++) {
-            var child = node.children[i];
-            if (UNWRAP_NAMES.indexOf(child.name) !== -1) {
-                for (var j = 0; j < child.children.length; j++) {
-                    child.children[j].getParent = node;
-                    newChildren.push(child.children[j]);
-                }
-            } else {
-                newChildren.push(child);
-            }
+      var child = node.children[i];
+      if (UNWRAP_NAMES.indexOf(child.name) !== -1) {
+        for (var j = 0; j < child.children.length; j++) {
+          child.children[j].getParent = node;
+          newChildren.push(child.children[j]);
         }
-        node.children = newChildren;
+      } else {
+        newChildren.push(child);
+      }
     }
+    node.children = newChildren;
+  }
 
-    // XQ 4.0: Prolog children FunctionDecl/VarDecl lack AnnotatedDecl wrapper — synthesize it
-    // so static analysis and visitors find Prolog > AnnotatedDecl > FunctionDecl/VarDecl
-    if (node.name === "Prolog") {
-        for (var i = 0; i < node.children.length; i++) {
-            var child = node.children[i];
-            if (child.name === "FunctionDecl" || child.name === "VarDecl") {
-                var wrapper = {
-                    name: "AnnotatedDecl",
-                    children: [child],
-                    value: undefined,
-                    pos: { sl: child.pos.sl, sc: child.pos.sc, el: child.pos.el, ec: child.pos.ec },
-                    getParent: node
-                };
-                child.getParent = wrapper;
-                node.children[i] = wrapper;
-            }
-        }
-    }
-
-    // XQ 4.0: VarRef lacks VarName wrapper — synthesize it so visitors find VarRef > $ VarName > EQName
-    if (node.name === "VarRef") {
-        var eqChild = null;
-        var eqIdx = -1;
-        for (var i = 0; i < node.children.length; i++) {
-            if (node.children[i].name === "EQName") {
-                eqChild = node.children[i];
-                eqIdx = i;
-                break;
-            }
-        }
-        if (eqChild && eqIdx !== -1) {
-            var varNameNode = {
-                name: "VarName",
-                children: [eqChild],
-                value: undefined,
-                pos: { sl: eqChild.pos.sl, sc: eqChild.pos.sc, el: eqChild.pos.el, ec: eqChild.pos.ec },
-                getParent: node
-            };
-            eqChild.getParent = varNameNode;
-            node.children[eqIdx] = varNameNode;
-        }
-    }
-
-    // Flatten EQName and URILiteral: set value from descendants, clear children
-    // EQName flattening matches JSONParseTreeHandler (line 92-94)
-    // URILiteral flattening needed because visitors access .value directly
-    if ((node.name === "EQName" || node.name === "URILiteral") && node.value === undefined) {
-        node.value = getNodeText(node);
-        node.children = [];
-    }
-
-    // Collapse single-child wrapper nonterminals (line 106-112)
+  // XQ 4.0: Prolog children FunctionDecl/VarDecl lack AnnotatedDecl wrapper — synthesize it
+  // so static analysis and visitors find Prolog > AnnotatedDecl > FunctionDecl/VarDecl
+  if (node.name === "Prolog") {
     for (var i = 0; i < node.children.length; i++) {
-        var child = node.children[i];
-        if (child.children.length === 1 && COLLAPSE_LIST.indexOf(child.name) !== -1) {
-            var replacement = child.children[0];
-            replacement.getParent = node;
-            node.children[i] = replacement;
-        }
+      var child = node.children[i];
+      if (child.name === "FunctionDecl" || child.name === "VarDecl") {
+        var wrapper = {
+          name: "AnnotatedDecl",
+          children: [child],
+          value: undefined,
+          pos: { sl: child.pos.sl, sc: child.pos.sc, el: child.pos.el, ec: child.pos.ec },
+          getParent: node,
+        };
+        child.getParent = wrapper;
+        node.children[i] = wrapper;
+      }
     }
+  }
 
-    // Set arity on FunctionCall and FunctionDecl
-    if (node.name === "FunctionCall") {
-        node.arity = countDescendants(node, "Argument");
-    } else if (node.name === "FunctionDecl") {
-        node.arity = countDescendants(node, "Param");
+  // XQ 4.0: VarRef lacks VarName wrapper — synthesize it so visitors find VarRef > $ VarName > EQName
+  if (node.name === "VarRef") {
+    var eqChild = null;
+    var eqIdx = -1;
+    for (var i = 0; i < node.children.length; i++) {
+      if (node.children[i].name === "EQName") {
+        eqChild = node.children[i];
+        eqIdx = i;
+        break;
+      }
     }
+    if (eqChild && eqIdx !== -1) {
+      var varNameNode = {
+        name: "VarName",
+        children: [eqChild],
+        value: undefined,
+        pos: { sl: eqChild.pos.sl, sc: eqChild.pos.sc, el: eqChild.pos.el, ec: eqChild.pos.ec },
+        getParent: node,
+      };
+      eqChild.getParent = varNameNode;
+      node.children[eqIdx] = varNameNode;
+    }
+  }
 
-    return node;
+  // Flatten EQName and URILiteral: set value from descendants, clear children
+  // EQName flattening matches JSONParseTreeHandler (line 92-94)
+  // URILiteral flattening needed because visitors access .value directly
+  if ((node.name === "EQName" || node.name === "URILiteral") && node.value === undefined) {
+    node.value = getNodeText(node);
+    node.children = [];
+  }
+
+  // Collapse single-child wrapper nonterminals (line 106-112)
+  for (var i = 0; i < node.children.length; i++) {
+    var child = node.children[i];
+    if (child.children.length === 1 && COLLAPSE_LIST.indexOf(child.name) !== -1) {
+      var replacement = child.children[0];
+      replacement.getParent = node;
+      node.children[i] = replacement;
+    }
+  }
+
+  // Set arity on FunctionCall and FunctionDecl
+  if (node.name === "FunctionCall") {
+    node.arity = countDescendants(node, "Argument");
+  } else if (node.name === "FunctionDecl") {
+    node.arity = countDescendants(node, "Param");
+  }
+
+  return node;
 }
 
 /**
  * Get concatenated text value of a node and its descendants.
  */
 function getNodeText(node) {
-    if (node.value !== undefined && node.value !== null) {
-        return node.value;
-    }
-    var text = "";
-    for (var i = 0; i < node.children.length; i++) {
-        text += getNodeText(node.children[i]);
-    }
-    return text;
+  if (node.value !== undefined && node.value !== null) {
+    return node.value;
+  }
+  var text = "";
+  for (var i = 0; i < node.children.length; i++) {
+    text += getNodeText(node.children[i]);
+  }
+  return text;
 }
 
 /**
  * Count descendants with a given name (searches children and grandchildren).
  */
 function countDescendants(node, name) {
-    var count = 0;
-    for (var i = 0; i < node.children.length; i++) {
-        var child = node.children[i];
-        if (child.name === name) count++;
-        if (child.children) {
-            for (var j = 0; j < child.children.length; j++) {
-                if (child.children[j].name === name) count++;
-            }
-        }
+  var count = 0;
+  for (var i = 0; i < node.children.length; i++) {
+    var child = node.children[i];
+    if (child.name === name) count++;
+    if (child.children) {
+      for (var j = 0; j < child.children.length; j++) {
+        if (child.children[j].name === name) count++;
+      }
     }
-    return count;
+  }
+  return count;
 }
 
 /**
@@ -344,25 +382,25 @@ function countDescendants(node, name) {
  * @returns {{ ast: object, error: object|null }}
  */
 function parseXQuery(input, ParserConstructor) {
-    var handler = new ParserConstructor.TopDownTreeBuilder();
-    var parser = new ParserConstructor(input, handler);
-    var error = null;
+  var handler = new ParserConstructor.TopDownTreeBuilder();
+  var parser = new ParserConstructor(input, handler);
+  var error = null;
 
+  try {
+    parser.parse_XQuery();
+  } catch (e) {
     try {
-        parser.parse_XQuery();
-    } catch (e) {
-        try {
-            error = parser.getErrorMessage(e);
-        } catch (_) {
-            error = e.message || String(e);
-        }
+      error = parser.getErrorMessage(e);
+    } catch (_) {
+      error = e.message || String(e);
     }
+  }
 
-    var rexRoot = extractTree(handler, input);
-    var lineOffsets = buildLineOffsets(input);
-    var ast = convertNode(rexRoot, input, lineOffsets);
+  var rexRoot = extractTree(handler, input);
+  var lineOffsets = buildLineOffsets(input);
+  var ast = convertNode(rexRoot, input, lineOffsets);
 
-    return { ast: ast, error: error };
+  return { ast: ast, error: error };
 }
 
 // Browser global for eXide
@@ -371,10 +409,10 @@ globalThis.rexParserAdapter = rexParserAdapter;
 
 // Export for CommonJS (Node.js testing)
 if (typeof module !== "undefined" && module.exports) {
-    module.exports = {
-        parseXQuery: parseXQuery,
-        convertNode: convertNode,
-        buildLineOffsets: buildLineOffsets,
-        offsetToLineCol: offsetToLineCol
-    };
+  module.exports = {
+    parseXQuery: parseXQuery,
+    convertNode: convertNode,
+    buildLineOffsets: buildLineOffsets,
+    offsetToLineCol: offsetToLineCol,
+  };
 }

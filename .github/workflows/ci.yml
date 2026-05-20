@@ -10,12 +10,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
-       fail-fast: false
-       matrix:
-         # eXide 4.0 requires eXist 7.0+ (lang/cursor modules from existdb-openapi),
-         # so we test only against the 'latest' (develop) Docker tag.
-         exist-version: [latest]
-         node-version: ['22']
+      fail-fast: false
+      matrix:
+        # eXide 4.0 requires eXist 7.0+ (lang/cursor modules from existdb-openapi),
+        # so we test only against the 'latest' (develop) Docker tag.
+        exist-version: [latest]
+        node-version: ["22"]
 
     steps:
       - uses: actions/checkout@v6
@@ -27,7 +27,7 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'npm'
+          cache: "npm"
 
       - name: Run npm CI
         run: npm ci

@@ -22,56 +22,55 @@ eXide.namespace("eXide.edit.JsonModeHelper");
  * JSON specific helper methods.
  */
 eXide.edit.JsonModeHelper = (function () {
+  Constr = function (editor) {
+    this.parent = editor;
+    this.editor = this.parent.editor;
+    this.addCommand("locate", this.locate);
+    this.addCommand("format", this.format);
+    this.addCommand("gotoSymbol", this.gotoSymbol);
+  };
 
-    Constr = function(editor) {
-        this.parent = editor;
-        this.editor = this.parent.editor;
-        this.addCommand("locate", this.locate);
-        this.addCommand("format", this.format);
-        this.addCommand("gotoSymbol", this.gotoSymbol);
-    };
+  eXide.util.oop.inherit(Constr, eXide.edit.ModeHelper);
 
-    eXide.util.oop.inherit(Constr, eXide.edit.ModeHelper);
+  Constr.prototype.createOutline = function (doc, onComplete) {
+    var state = this.editor.state;
+    var tree = CM6.ensureSyntaxTree(state, state.doc.length, 5000) || CM6.syntaxTree(state);
+    var depth = 0;
+    tree.iterate({
+      enter: function (node) {
+        if (node.name === "Property") {
+          var nameNode = node.node.getChild("PropertyName");
+          if (nameNode && depth < 3) {
+            var name = state.sliceDoc(nameNode.from, nameNode.to);
+            if (name.charAt(0) === '"') name = name.slice(1, -1);
+            var line = state.doc.lineAt(node.from);
+            var valNode = nameNode.nextSibling;
+            var valType = valNode ? valNode.name : "";
+            doc.functions.push({
+              type: eXide.edit.Document.TYPE_FUNCTION,
+              name: name,
+              indent: depth,
+              source: doc.getPath(),
+              signature: name + ": " + valType.toLowerCase(),
+              sort: String(line.number).padStart(6, "0"),
+              row: line.number - 1,
+              from: node.from,
+              to: node.to,
+            });
+          }
+          depth++;
+          return true;
+        }
+      },
+      leave: function (node) {
+        if (node.name === "Property") {
+          depth--;
+        }
+      },
+    });
+    this.collectErrors(doc);
+    if (onComplete) onComplete(doc);
+  };
 
-    Constr.prototype.createOutline = function(doc, onComplete) {
-        var state = this.editor.state;
-        var tree = CM6.ensureSyntaxTree(state, state.doc.length, 5000) || CM6.syntaxTree(state);
-        var depth = 0;
-        tree.iterate({
-            enter: function(node) {
-                if (node.name === "Property") {
-                    var nameNode = node.node.getChild("PropertyName");
-                    if (nameNode && depth < 3) {
-                        var name = state.sliceDoc(nameNode.from, nameNode.to);
-                        if (name.charAt(0) === '"') name = name.slice(1, -1);
-                        var line = state.doc.lineAt(node.from);
-                        var valNode = nameNode.nextSibling;
-                        var valType = valNode ? valNode.name : "";
-                        doc.functions.push({
-                            type: eXide.edit.Document.TYPE_FUNCTION,
-                            name: name,
-                            indent: depth,
-                            source: doc.getPath(),
-                            signature: name + ": " + valType.toLowerCase(),
-                            sort: String(line.number).padStart(6, "0"),
-                            row: line.number - 1,
-                            from: node.from,
-                            to: node.to
-                        });
-                    }
-                    depth++;
-                    return true;
-                }
-            },
-            leave: function(node) {
-                if (node.name === "Property") {
-                    depth--;
-                }
-            }
-        });
-        this.collectErrors(doc);
-        if (onComplete) onComplete(doc);
-    };
-
-    return Constr;
-}());
+  return Constr;
+})();

@@ -1,18 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
-           xmlns:vc="http://www.w3.org/2007/XMLSchema-versioning" vc:minVersion="1.1"
-           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-           xmlns:cc="http://exist-db.org/collection-config/1.0"
-           xmlns:dcterms="http://purl.org/dc/terms/"
-           elementFormDefault="qualified"
-           targetNamespace="http://exist-db.org/collection-config/1.0"
-           version="1.0.0">
-
+<xs:schema
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    xmlns:vc="http://www.w3.org/2007/XMLSchema-versioning"
+    vc:minVersion="1.1"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:cc="http://exist-db.org/collection-config/1.0"
+    xmlns:dcterms="http://purl.org/dc/terms/"
+    elementFormDefault="qualified"
+    targetNamespace="http://exist-db.org/collection-config/1.0"
+    version="1.0.0"
+>
     <xs:annotation>
-        <xs:documentation>Schema for eXist-db Collection Configuration files /db/system/config/db/**/collection.xconf</xs:documentation>
+        <xs:documentation
+        >Schema for eXist-db Collection Configuration files /db/system/config/db/**/collection.xconf</xs:documentation>
         <xs:appinfo>
             <dcterms:title>Schema for eXist-db Collection Configuration Files</dcterms:title>
-            <dcterms:created xsi:type="dcterms:W3CDTF">2011-10-09T18:47:21.319+01:00</dcterms:created>
+            <dcterms:created
+                xsi:type="dcterms:W3CDTF"
+            >2011-10-09T18:47:21.319+01:00</dcterms:created>
             <dcterms:creator>Adam Retter</dcterms:creator>
         </xs:appinfo>
     </xs:annotation>
@@ -21,7 +26,8 @@
 
     <xs:complexType name="collectionType">
         <xs:annotation>
-            <xs:documentation>At least one `index`, `triggers`, or `validation` element must be present, and each may only appear once.</xs:documentation>
+            <xs:documentation
+            >At least one `index`, `triggers`, or `validation` element must be present, and each may only appear once.</xs:documentation>
         </xs:annotation>
         <xs:all>
             <xs:element ref="cc:index" minOccurs="0"/>
@@ -38,11 +44,15 @@
         <xs:all>
             <xs:element ref="cc:lucene" minOccurs="0"/>
             <xs:element ref="cc:range" minOccurs="0"/>
-            <xs:element name="create" type="cc:oldRangeIndexType" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:element
+                name="create"
+                type="cc:oldRangeIndexType"
+                minOccurs="0"
+                maxOccurs="unbounded"
+            />
             <xs:element ref="cc:ngram" minOccurs="0" maxOccurs="unbounded"/>
             <xs:element ref="cc:gml" minOccurs="0"/>
         </xs:all>
-
     </xs:complexType>
 
     <xs:complexType name="oldRangeIndexType">
@@ -78,8 +88,18 @@
 
     <xs:group name="fieldDefinitions">
         <xs:all>
-            <xs:element name="condition" type="cc:newRangeIndexConditionType" minOccurs="0" maxOccurs="unbounded"/>
-            <xs:element name="field" type="cc:newRangeIndexFieldType" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:element
+                name="condition"
+                type="cc:newRangeIndexConditionType"
+                minOccurs="0"
+                maxOccurs="unbounded"
+            />
+            <xs:element
+                name="field"
+                type="cc:newRangeIndexFieldType"
+                minOccurs="0"
+                maxOccurs="unbounded"
+            />
         </xs:all>
     </xs:group>
 
@@ -112,7 +132,8 @@
         <xs:attributeGroup ref="cc:diacriticsOpt"/>
         <xs:attribute name="vector-store" use="optional" default="db">
             <xs:annotation>
-                <xs:documentation>Where to store vectors for embedding=local: 'db' = Lucene + vector.dbx (default, reindex reads from db); 'lucene' = Lucene only (US-I6, reindex recomputes from source text).</xs:documentation>
+                <xs:documentation
+                >Where to store vectors for embedding=local: 'db' = Lucene + vector.dbx (default, reindex reads from db); 'lucene' = Lucene only (US-I6, reindex recomputes from source text).</xs:documentation>
             </xs:annotation>
             <xs:simpleType>
                 <xs:restriction base="xs:token">
@@ -156,19 +177,55 @@
         <xs:all>
             <xs:element name="facet" minOccurs="0" maxOccurs="unbounded" type="cc:facetAttrType"/>
             <xs:element name="field" minOccurs="0" maxOccurs="unbounded" type="cc:fieldAttrType"/>
-            <xs:element name="ignore" minOccurs="0" maxOccurs="unbounded" type="cc:singleQnameAttrType"/>
-            <xs:element name="inline" minOccurs="0" maxOccurs="unbounded" type="cc:singleQnameAttrType"/>
-            <xs:element name="match-attribute" minOccurs="0" maxOccurs="unbounded" type="cc:matchAttrBoostType"/>
-            <xs:element name="match-sibling-attribute" minOccurs="0" maxOccurs="unbounded" type="cc:matchAttrBoostType"/>
-            <xs:element name="has-attribute" minOccurs="0" maxOccurs="unbounded" type="cc:hasAttrBoostType"/>
-            <xs:element name="has-sibling-attribute" minOccurs="0" maxOccurs="unbounded" type="cc:hasAttrBoostType"/>
-            <xs:element name="vector-field" minOccurs="0" maxOccurs="unbounded" type="cc:vectorFieldAttrType"/>
+            <xs:element
+                name="ignore"
+                minOccurs="0"
+                maxOccurs="unbounded"
+                type="cc:singleQnameAttrType"
+            />
+            <xs:element
+                name="inline"
+                minOccurs="0"
+                maxOccurs="unbounded"
+                type="cc:singleQnameAttrType"
+            />
+            <xs:element
+                name="match-attribute"
+                minOccurs="0"
+                maxOccurs="unbounded"
+                type="cc:matchAttrBoostType"
+            />
+            <xs:element
+                name="match-sibling-attribute"
+                minOccurs="0"
+                maxOccurs="unbounded"
+                type="cc:matchAttrBoostType"
+            />
+            <xs:element
+                name="has-attribute"
+                minOccurs="0"
+                maxOccurs="unbounded"
+                type="cc:hasAttrBoostType"
+            />
+            <xs:element
+                name="has-sibling-attribute"
+                minOccurs="0"
+                maxOccurs="unbounded"
+                type="cc:hasAttrBoostType"
+            />
+            <xs:element
+                name="vector-field"
+                minOccurs="0"
+                maxOccurs="unbounded"
+                type="cc:vectorFieldAttrType"
+            />
         </xs:all>
     </xs:group>
 
     <xs:complexType name="vectorFieldAttrType">
         <xs:annotation>
-            <xs:documentation>Vector field for KNN/semantic search. Dense float vectors; dimension fixed per field.</xs:documentation>
+            <xs:documentation
+            >Vector field for KNN/semantic search. Dense float vectors; dimension fixed per field.</xs:documentation>
         </xs:annotation>
         <xs:attributeGroup ref="cc:nameReq"/>
         <xs:attributeGroup ref="cc:expressionReq"/>
@@ -192,7 +249,8 @@
         </xs:attribute>
         <xs:attribute name="embedding" use="optional">
             <xs:annotation>
-                <xs:documentation>local = ONNX or HTTP (model-path determines); http = external API (model-path required, e.g. https://api.openai.com/v1). Set OPENAI_API_KEY or COHERE_API_KEY env var.</xs:documentation>
+                <xs:documentation
+                >local = ONNX or HTTP (model-path determines); http = external API (model-path required, e.g. https://api.openai.com/v1). Set OPENAI_API_KEY or COHERE_API_KEY env var.</xs:documentation>
             </xs:annotation>
             <xs:simpleType>
                 <xs:restriction base="xs:token">
@@ -209,7 +267,8 @@
 
     <xs:complexType name="textType">
         <xs:annotation>
-            <xs:documentation>Either @qname or @match must be specified. Not both!</xs:documentation>
+            <xs:documentation
+            >Either @qname or @match must be specified. Not both!</xs:documentation>
         </xs:annotation>
         <xs:group ref="cc:textInstruction"/>
         <xs:attributeGroup ref="cc:qnameOpt"/>
@@ -279,7 +338,8 @@
         </xs:sequence>
         <xs:attributeGroup ref="cc:eventOpt">
             <xs:annotation>
-                <xs:documentation>This is deprecated, triggers should now code functions for each event</xs:documentation>
+                <xs:documentation
+                >This is deprecated, triggers should now code functions for each event</xs:documentation>
             </xs:annotation>
         </xs:attributeGroup>
         <xs:attributeGroup ref="cc:classReq"/>
@@ -435,12 +495,14 @@
                 <xs:restriction base="xs:token">
                     <xs:enumeration value="yes">
                         <xs:annotation>
-                            <xs:documentation>Include descendant elements in index</xs:documentation>
+                            <xs:documentation
+                            >Include descendant elements in index</xs:documentation>
                         </xs:annotation>
                     </xs:enumeration>
                     <xs:enumeration value="no">
                         <xs:annotation>
-                            <xs:documentation>Do not include descendant elements in index</xs:documentation>
+                            <xs:documentation
+                            >Do not include descendant elements in index</xs:documentation>
                         </xs:annotation>
                     </xs:enumeration>
                 </xs:restriction>
@@ -517,7 +579,8 @@
                 <xs:restriction base="xs:token">
                     <xs:enumeration value="yes">
                         <xs:annotation>
-                            <xs:documentation>Use numeric comparison for equality and ordinal comparisons</xs:documentation>
+                            <xs:documentation
+                            >Use numeric comparison for equality and ordinal comparisons</xs:documentation>
                         </xs:annotation>
                     </xs:enumeration>
                     <xs:enumeration value="no">
@@ -580,7 +643,8 @@
                     </xs:enumeration>
                     <xs:enumeration value="matches">
                         <xs:annotation>
-                            <xs:documentation>Matches (supports Java regular expressions)</xs:documentation>
+                            <xs:documentation
+                            >Matches (supports Java regular expressions)</xs:documentation>
                         </xs:annotation>
                     </xs:enumeration>
                 </xs:restriction>
@@ -641,7 +705,8 @@
                 <xs:restriction base="xs:token">
                     <xs:enumeration value="trim">
                         <xs:annotation>
-                            <xs:documentation>Removing leading and trailing whitespace</xs:documentation>
+                            <xs:documentation
+                            >Removing leading and trailing whitespace</xs:documentation>
                         </xs:annotation>
                     </xs:enumeration>
                     <xs:enumeration value="normalize">

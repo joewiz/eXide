@@ -1,31 +1,31 @@
 .xml-element {
-	margin-left: 20px;
+  margin-left: 20px;
 }
 
 .xml-element-tag {
-	color: #01005F;
+  color: #01005f;
 }
 
 .xml-element-name {
-	color: #1818B4;
+  color: #1818b4;
 }
 
 .xml-attr-name {
-	color: #189518;
+  color: #189518;
 }
 
 .xml-attr-value {
-	color: #8B1410;
+  color: #8b1410;
 }
 
 .xml-text {
-	color: #000000;
+  color: #000000;
 }
 
 .xml-match {
-	background-color: #FFFF00;
+  background-color: #ffff00;
 }
 
 .xml-comment {
-	color: #5F005D;
+  color: #5f005d;
 }
