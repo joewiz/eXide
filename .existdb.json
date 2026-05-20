@@ -1,20 +1,15 @@
 {
-    "servers": {
-        "localhost": {
-            "server": "http://localhost:8080/exist",
-            "user": "admin",
-            "password": ""
-        }
-    },
-    "sync": {
-        "server": "localhost",
-        "root": "/db/apps/eXide",
-        "active": true,
-        "ignore": [
-            ".existdb.json",
-            ".git/**",
-            "node_modules/**",
-            "bower_components/**"
-        ]
+  "servers": {
+    "localhost": {
+      "server": "http://localhost:8080/exist",
+      "user": "admin",
+      "password": ""
     }
+  },
+  "sync": {
+    "server": "localhost",
+    "root": "/db/apps/eXide",
+    "active": true,
+    "ignore": [".existdb.json", ".git/**", "node_modules/**", "bower_components/**"]
+  }
 }

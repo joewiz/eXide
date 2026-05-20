@@ -1,6 +1,6 @@
 /*
  *  eXide - web-based XQuery IDE
- *  
+ *
  *  Copyright (C) 2013 Wolfgang Meier
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -23,66 +23,68 @@ eXide.namespace("eXide.util.Snippets");
  * Manage and load text snippets for the different modes.
  */
 eXide.util.Snippets = (function () {
-    
-    var snippetsForMode = {};
+  var snippetsForMode = {};
 
-    /**
-     * Parse snippet files into an array of {name, content} objects.
-     */
-    function parseSnippetFile(data) {
-        var snippets = [];
-        var lines = data.split("\n");
-        var current = null;
-        for (var i = 0; i < lines.length; i++) {
-            var line = lines[i];
-            if (line.indexOf("snippet ") === 0) {
-                if (current) snippets.push(current);
-                current = { name: line.substring(8).trim(), content: "" };
-            } else if (current && (line.charAt(0) === "\t" || line === "")) {
-                current.content += (current.content ? "\n" : "") + (line.charAt(0) === "\t" ? line.substring(1) : line);
-            }
-        }
+  /**
+   * Parse snippet files into an array of {name, content} objects.
+   */
+  function parseSnippetFile(data) {
+    var snippets = [];
+    var lines = data.split("\n");
+    var current = null;
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (line.indexOf("snippet ") === 0) {
         if (current) snippets.push(current);
-        return snippets;
+        current = { name: line.substring(8).trim(), content: "" };
+      } else if (current && (line.charAt(0) === "\t" || line === "")) {
+        current.content +=
+          (current.content ? "\n" : "") + (line.charAt(0) === "\t" ? line.substring(1) : line);
+      }
     }
+    if (current) snippets.push(current);
+    return snippets;
+  }
 
-    function load(mode) {
-        if (snippetsForMode[mode]) {
-            return;
-        }
-        snippetsForMode[mode] = [];
-        fetch("templates/" + mode + ".snippets")
-        .then(function(response) { return response.text(); })
-        .then(function(data) {
-            snippetsForMode[mode] = parseSnippetFile(data);
-        })
-        .catch(function() {});
+  function load(mode) {
+    if (snippetsForMode[mode]) {
+      return;
     }
+    snippetsForMode[mode] = [];
+    fetch("templates/" + mode + ".snippets")
+      .then(function (response) {
+        return response.text();
+      })
+      .then(function (data) {
+        snippetsForMode[mode] = parseSnippetFile(data);
+      })
+      .catch(function () {});
+  }
 
-    function reload(mode, data) {
-        var snippets = parseSnippetFile(data);
-        console.log("Replacing snippets %o for mode %s", snippets, mode);
-        snippetsForMode[mode] = snippets;
+  function reload(mode, data) {
+    var snippets = parseSnippetFile(data);
+    console.log("Replacing snippets %o for mode %s", snippets, mode);
+    snippetsForMode[mode] = snippets;
+  }
+
+  function getTemplates(doc, prefix) {
+    var snippets = snippetsForMode[doc.getSyntax()];
+    var templates = [];
+    for (var i = 0; i < snippets.length; i++) {
+      if (!prefix || snippets[i].name.indexOf(prefix) == 0) {
+        templates.push({
+          TYPE: eXide.edit.Document.TYPE_TEMPLATE,
+          name: snippets[i].name,
+          template: snippets[i].content,
+        });
+      }
     }
-    
-    function getTemplates(doc, prefix) {
-        var snippets = snippetsForMode[doc.getSyntax()];
-        var templates = [];
-        for (var i = 0; i < snippets.length; i++) {
-            if (!prefix || snippets[i].name.indexOf(prefix) == 0) {
-                templates.push({
-                    TYPE: eXide.edit.Document.TYPE_TEMPLATE,
-                    name: snippets[i].name,
-                    template: snippets[i].content
-                });
-            }
-        }
-        return templates;
-    }
-    
-    return {
-        init: load,
-        getTemplates: getTemplates,
-        reload: reload
-    };
-}());
+    return templates;
+  }
+
+  return {
+    init: load,
+    getTemplates: getTemplates,
+    reload: reload,
+  };
+})();

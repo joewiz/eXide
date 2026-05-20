@@ -22,72 +22,76 @@
  * Requires prettierBundle global (loaded from prettier-bundle.js).
  */
 var prettierFormat = (function () {
+  var MODE_CONFIG = {
+    xquery: { parser: "xquery" },
+    xml: { parser: "xml", hasXmlOptions: true },
+    html: { parser: "html", hasXmlOptions: true, hasHtmlOptions: true },
+    css: { parser: "css" },
+    less: { parser: "less" },
+    javascript: { parser: "babel", hasJsOptions: true },
+    json: { parser: "json" },
+    markdown: { parser: "markdown", hasMdOptions: true },
+  };
 
-    var MODE_CONFIG = {
-        "xquery":     { parser: "xquery" },
-        "xml":        { parser: "xml", hasXmlOptions: true },
-        "html":       { parser: "html", hasXmlOptions: true, hasHtmlOptions: true },
-        "css":        { parser: "css" },
-        "less":       { parser: "less" },
-        "javascript": { parser: "babel", hasJsOptions: true },
-        "json":       { parser: "json" },
-        "markdown":   { parser: "markdown", hasMdOptions: true }
-    };
-
-    return {
-        /**
-         * Format code using Prettier.
-         * @param {string} code - source code to format
-         * @param {string} mode - eXide syntax mode name
-         * @returns {Promise<string>} formatted code
-         */
-        format: function (code, mode) {
-            if (typeof prettierBundle === "undefined") {
-                return Promise.reject(new Error("Prettier is not loaded."));
-            }
-            var config = MODE_CONFIG[mode];
-            if (!config) {
-                return Promise.reject(new Error("No formatter available for mode: " + mode));
-            }
-            // TODO: remove this guard when prettier-plugin-xquery supports XQuery 4.0
-            // See https://github.com/nickcollins/prettier-plugin-xquery
-            if (mode === "xquery" && /xquery\s+version\s+["']4\.0["']/.test(code)) {
-                return Promise.reject(new Error("Formatting is not yet supported for XQuery 4.0 code."));
-            }
-            var prefs = (typeof eXide !== "undefined" && eXide.app && eXide.app.editor && eXide.app.editor._preferences) || {};
-            var useTabs = prefs.indent === 0;
-            var options = {
-                parser: config.parser,
-                plugins: prettierBundle.plugins,
-                tabWidth: prefs.indentSize || 4,
-                useTabs: useTabs,
-                printWidth: prefs.prettierPrintWidth || 80,
-                singleQuote: prefs.prettierSingleQuote || false
-            };
-            if (config.hasXmlOptions) {
-                options.xmlWhitespaceSensitivity = prefs.prettierXmlWhitespaceSensitivity || "ignore";
-                options.xmlSelfClosingSpace = prefs.prettierXmlSelfClosingSpace !== false;
-                options.xmlSortAttributesByKey = prefs.prettierXmlSortAttributesByKey || false;
-                options.xmlQuoteAttributes = prefs.prettierXmlQuoteAttributes || "preserve";
-                options.singleAttributePerLine = prefs.prettierSingleAttributePerLine || false;
-                options.bracketSameLine = prefs.prettierBracketSameLine !== false;
-            }
-            if (config.hasHtmlOptions) {
-                options.htmlWhitespaceSensitivity = prefs.prettierHtmlWhitespaceSensitivity || "css";
-            }
-            if (config.hasJsOptions) {
-                options.bracketSpacing = prefs.prettierBracketSpacing !== false;
-                options.semi = prefs.prettierSemi !== false;
-                options.trailingComma = prefs.prettierTrailingComma || "all";
-                options.arrowParens = prefs.prettierArrowParens || "always";
-            }
-            if (config.hasMdOptions) {
-                options.proseWrap = prefs.prettierProseWrap || "preserve";
-            }
-            return prettierBundle.prettier.format(code, options);
-        }
-    };
-}());
+  return {
+    /**
+     * Format code using Prettier.
+     * @param {string} code - source code to format
+     * @param {string} mode - eXide syntax mode name
+     * @returns {Promise<string>} formatted code
+     */
+    format: function (code, mode) {
+      if (typeof prettierBundle === "undefined") {
+        return Promise.reject(new Error("Prettier is not loaded."));
+      }
+      var config = MODE_CONFIG[mode];
+      if (!config) {
+        return Promise.reject(new Error("No formatter available for mode: " + mode));
+      }
+      // TODO: remove this guard when prettier-plugin-xquery supports XQuery 4.0
+      // See https://github.com/nickcollins/prettier-plugin-xquery
+      if (mode === "xquery" && /xquery\s+version\s+["']4\.0["']/.test(code)) {
+        return Promise.reject(new Error("Formatting is not yet supported for XQuery 4.0 code."));
+      }
+      var prefs =
+        (typeof eXide !== "undefined" &&
+          eXide.app &&
+          eXide.app.editor &&
+          eXide.app.editor._preferences) ||
+        {};
+      var useTabs = prefs.indent === 0;
+      var options = {
+        parser: config.parser,
+        plugins: prettierBundle.plugins,
+        tabWidth: prefs.indentSize || 4,
+        useTabs: useTabs,
+        printWidth: prefs.prettierPrintWidth || 80,
+        singleQuote: prefs.prettierSingleQuote || false,
+      };
+      if (config.hasXmlOptions) {
+        options.xmlWhitespaceSensitivity = prefs.prettierXmlWhitespaceSensitivity || "ignore";
+        options.xmlSelfClosingSpace = prefs.prettierXmlSelfClosingSpace !== false;
+        options.xmlSortAttributesByKey = prefs.prettierXmlSortAttributesByKey || false;
+        options.xmlQuoteAttributes = prefs.prettierXmlQuoteAttributes || "preserve";
+        options.singleAttributePerLine = prefs.prettierSingleAttributePerLine || false;
+        options.bracketSameLine = prefs.prettierBracketSameLine !== false;
+      }
+      if (config.hasHtmlOptions) {
+        options.htmlWhitespaceSensitivity = prefs.prettierHtmlWhitespaceSensitivity || "css";
+      }
+      if (config.hasJsOptions) {
+        options.bracketSpacing = prefs.prettierBracketSpacing !== false;
+        options.semi = prefs.prettierSemi !== false;
+        options.trailingComma = prefs.prettierTrailingComma || "all";
+        options.arrowParens = prefs.prettierArrowParens || "always";
+      }
+      if (config.hasMdOptions) {
+        options.proseWrap = prefs.prettierProseWrap || "preserve";
+      }
+      return prettierBundle.prettier.format(code, options);
+    },
+  };
+})();
 
 // Browser global (needed when bundled by esbuild)
 globalThis.prettierFormat = prettierFormat;

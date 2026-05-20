@@ -196,18 +196,18 @@ globalThis.CM6 = {
 `;
 
 esbuild
-    .build({
-        stdin: {
-            contents: entryContents,
-            resolveDir: path.resolve(__dirname, ".."),
-            loader: "js",
-        },
-        bundle: true,
-        format: "iife",
-        platform: "browser",
-        target: ["es2018"],
-        outfile: path.resolve(__dirname, "../resources/scripts/cm6-bundle.js"),
-        minify: true,
-        logLevel: "info",
-    })
-    .catch(() => process.exit(1));
+  .build({
+    stdin: {
+      contents: entryContents,
+      resolveDir: path.resolve(__dirname, ".."),
+      loader: "js",
+    },
+    bundle: true,
+    format: "iife",
+    platform: "browser",
+    target: ["es2018"],
+    outfile: path.resolve(__dirname, "../resources/scripts/cm6-bundle.js"),
+    minify: true,
+    logLevel: "info",
+  })
+  .catch(() => process.exit(1));

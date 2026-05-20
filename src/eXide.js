@@ -18,39 +18,38 @@
  */
 
 function apiPath(dbPath) {
-	return "api/storage/" + dbPath.replace(/^\//, "").split("/").map(encodeURIComponent).join("/");
+  return "api/storage/" + dbPath.replace(/^\//, "").split("/").map(encodeURIComponent).join("/");
 }
 
 // main entry point
-document.addEventListener("DOMContentLoaded", function() {
-    window.name = "eXide";
+document.addEventListener("DOMContentLoaded", function () {
+  window.name = "eXide";
 
-    // parse query parameters passed in by URL:
-    var qs = (function(a) {
-        if (a == "") return {};
-        var b = {};
-        for (var i = 0; i < a.length; ++i)
-        {
-            var p=a[i].split('=');
-            if (p.length != 2) continue;
-            b[p[0]] = decodeURIComponent(p[1].replace(/\+/g, " "));
-        }
-        return b;
-    })(window.location.search.substr(1).split('&'));
+  // parse query parameters passed in by URL:
+  var qs = (function (a) {
+    if (a == "") return {};
+    var b = {};
+    for (var i = 0; i < a.length; ++i) {
+      var p = a[i].split("=");
+      if (p.length != 2) continue;
+      b[p[0]] = decodeURIComponent(p[1].replace(/\+/g, " "));
+    }
+    return b;
+  })(window.location.search.substr(1).split("&"));
 
-    // check parameters passed in GET request
-    eXide.app.init(function (restored) {
-        var openDoc = qs["open"];
-        var snippet = qs["snip"];
-        if (openDoc) {
-            eXide.app.findDocument(qs["open"]);
-        } else if (snippet) {
-            eXide.app.newDocument(snippet, "xquery");
-        }
-        if (window.opener && window.opener.eXide_onload) {
-            window.opener.eXide_onload(eXide.app);
-        }
-    });
+  // check parameters passed in GET request
+  eXide.app.init(function (restored) {
+    var openDoc = qs["open"];
+    var snippet = qs["snip"];
+    if (openDoc) {
+      eXide.app.findDocument(qs["open"]);
+    } else if (snippet) {
+      eXide.app.newDocument(snippet, "xquery");
+    }
+    if (window.opener && window.opener.eXide_onload) {
+      window.opener.eXide_onload(eXide.app);
+    }
+  });
 });
 
 eXide.namespace("eXide.app");
@@ -58,2481 +57,2706 @@ eXide.namespace("eXide.app");
 /**
  * Static class for the main application. Controls the GUI.
  */
-eXide.app = (function(util) {
+eXide.app = (function (util) {
+  var editor;
 
-	var editor;
+  var layout;
+  var deploymentEditor;
+  var dbBrowser;
+  var projects;
+  var preferences;
+  var templates = {};
+  var menu;
+  var lastQuery = null;
+  var hitCount = 0;
+  var startOffset = 0;
+  var currentOffset = 0;
+  var endOffset = 0;
+  var numberOfResults = 10;
+  var activeResultIdx = -1;
 
-    var layout;
-	var deploymentEditor;
-	var dbBrowser;
-    var projects;
-	var preferences;
-    var templates = {};
-    var menu;
-    var lastQuery = null;
-	var hitCount = 0;
-	var startOffset = 0;
-	var currentOffset = 0;
-	var endOffset = 0;
-    var numberOfResults = 10;
-    var activeResultIdx = -1;
+  var login = null;
 
-	var login = null;
+  var allowDnd = true;
 
-    var allowDnd = true;
+  // used to detect when window looses focus
+  var hasFocus = true;
 
-    // used to detect when window looses focus
-    var hasFocus = true;
+  var resultPanel = "south";
 
-    var resultPanel = "south";
+  var monitor = null;
 
-    var monitor = null;
+  var dialogs = {};
 
-    var dialogs = {};
+  /**
+   * Apply CM6 syntax highlighting to a result content element.
+   * Detects the language from the serialization mode and uses
+   * highlightTree to produce highlighted spans.
+   */
+  function highlightResultContent(contentEl) {
+    if (!CM6.highlightTree) return;
+    var text = contentEl.textContent;
+    if (!text || text.length === 0) return;
 
-    /**
-     * Apply CM6 syntax highlighting to a result content element.
-     * Detects the language from the serialization mode and uses
-     * highlightTree to produce highlighted spans.
-     */
-    function highlightResultContent(contentEl) {
-        if (!CM6.highlightTree) return;
-        var text = contentEl.textContent;
-        if (!text || text.length === 0) return;
-
-        var serializationMode = document.getElementById("serialization-mode").value;
-        var langSupport;
-        switch (serializationMode) {
-            case "xml":
-            case "xhtml":
-            case "xhtml5":
-            case "microxml":
-                langSupport = CM6.xml();
-                break;
-            case "json":
-                langSupport = CM6.json();
-                break;
-            case "html5":
-                langSupport = CM6.html();
-                break;
-            default:
-                // Sniff content: XML starts with < or whitespace+<
-                if (/^\s*</.test(text)) {
-                    langSupport = CM6.xml();
-                } else if (/^\s*[\[{]/.test(text)) {
-                    langSupport = CM6.json();
-                } else {
-                    return; // plain text, no highlighting
-                }
-        }
-        var lang = langSupport.language;
-        var tree = lang.parser.parse(text);
-        var parts = [];
-        var pos = 0;
-        CM6.highlightTree(tree, CM6.classHighlighter, function(from, to, classes) {
-            if (from > pos) {
-                parts.push(document.createTextNode(text.slice(pos, from)));
-            }
-            var span = document.createElement("span");
-            span.className = classes;
-            span.textContent = text.slice(from, to);
-            parts.push(span);
-            pos = to;
-        });
-        if (pos < text.length) {
-            parts.push(document.createTextNode(text.slice(pos)));
-        }
-        if (parts.length > 0) {
-            contentEl.textContent = "";
-            for (var i = 0; i < parts.length; i++) {
-                contentEl.appendChild(parts[i]);
-            }
+    var serializationMode = document.getElementById("serialization-mode").value;
+    var langSupport;
+    switch (serializationMode) {
+      case "xml":
+      case "xhtml":
+      case "xhtml5":
+      case "microxml":
+        langSupport = CM6.xml();
+        break;
+      case "json":
+        langSupport = CM6.json();
+        break;
+      case "html5":
+        langSupport = CM6.html();
+        break;
+      default:
+        // Sniff content: XML starts with < or whitespace+<
+        if (/^\s*</.test(text)) {
+          langSupport = CM6.xml();
+        } else if (/^\s*[\[{]/.test(text)) {
+          langSupport = CM6.json();
+        } else {
+          return; // plain text, no highlighting
         }
     }
+    var lang = langSupport.language;
+    var tree = lang.parser.parse(text);
+    var parts = [];
+    var pos = 0;
+    CM6.highlightTree(tree, CM6.classHighlighter, function (from, to, classes) {
+      if (from > pos) {
+        parts.push(document.createTextNode(text.slice(pos, from)));
+      }
+      var span = document.createElement("span");
+      span.className = classes;
+      span.textContent = text.slice(from, to);
+      parts.push(span);
+      pos = to;
+    });
+    if (pos < text.length) {
+      parts.push(document.createTextNode(text.slice(pos)));
+    }
+    if (parts.length > 0) {
+      contentEl.textContent = "";
+      for (var i = 0; i < parts.length; i++) {
+        contentEl.appendChild(parts[i]);
+      }
+    }
+  }
 
-    var webResources = {
-        "html": 1,
-        "javascript": 1,
-        "css": 1,
-        "less": 1
-    };
+  var webResources = {
+    html: 1,
+    javascript: 1,
+    css: 1,
+    less: 1,
+  };
 
-	var app = {
+  var app = {
+    init: function (afterInitCallback) {
+      if (!("flex" in document.documentElement.style)) {
+        document.getElementById("startup-error").style.display = "";
+        return;
+      }
 
-		init: function(afterInitCallback) {
-		    if (!("flex" in document.documentElement.style)) {
-		        document.getElementById("startup-error").style.display = "";
-		        return;
-            }
+      projects = new eXide.edit.Projects();
+      menu = new util.Menubar(document.querySelector(".menu"));
+      editor = new eXide.edit.Editor(document.getElementById("editor"), menu);
+      deploymentEditor = new eXide.edit.PackageEditor(projects);
 
-            projects = new eXide.edit.Projects();
-            menu = new util.Menubar(document.querySelector(".menu"));
-			editor = new eXide.edit.Editor(document.getElementById("editor"), menu);
-			deploymentEditor = new eXide.edit.PackageEditor(projects);
+      dbBrowser = new eXide.browse.Browser(document.getElementById("open-dialog"));
 
-			dbBrowser = new eXide.browse.Browser(document.getElementById("open-dialog"));
+      preferences = new util.Preferences(editor);
 
+      editor.addEventListener("setTheme", app.setTheme);
 
-			preferences = new util.Preferences(editor);
+      app.initGUI(menu);
 
-            editor.addEventListener("setTheme", app.setTheme);
+      var dnd = new eXide.util.DnD("body");
+      dnd.addEventListener("drop", app.dropFile);
 
-            app.initGUI(menu);
+      // save restored paths for later
+      app.getLogin(function () {
+        app.initStatus("Restoring state");
+        app.restoreState(function (restored) {
+          app.updateLayoutTop();
+          editor.init();
 
-			var dnd = new eXide.util.DnD("body");
-			dnd.addEventListener("drop", app.dropFile);
+          // Connect WebSocket for real-time LSP and monitoring
+          if (typeof eXide.ws !== "undefined" && eXide.ws.autoConnect) {
+            eXide.ws.autoConnect();
 
-            // save restored paths for later
-            app.getLogin(function() {
-                app.initStatus("Restoring state");
-                app.restoreState(function(restored) {
-                    app.updateLayoutTop();
-                    editor.init();
-
-                    // Connect WebSocket for real-time LSP and monitoring
-                    if (typeof eXide.ws !== "undefined" && eXide.ws.autoConnect) {
-                        eXide.ws.autoConnect();
-
-                        // Listen for pushed diagnostics from the server
-                        eXide.ws.on("textDocument/publishDiagnostics", function (data) {
-                            if (!data || !data.uri) return;
-                            var doc = editor.getDocument(data.uri);
-                            if (!doc) return;
-                            var diagnostics = data.diagnostics;
-                            if (!diagnostics || !Array.isArray(diagnostics) || diagnostics.length === 0) {
-                                // Clear errors for this document
-                                if (doc === editor.getActiveDocument()) {
-                                    editor.updateStatus("");
-                                    editor.clearErrors();
-                                }
-                                return;
-                            }
-                            // Apply first error to the active document
-                            if (doc === editor.getActiveDocument()) {
-                                var err = diagnostics[0];
-                                if (err && err.message) {
-                                    editor.updateStatus(err.message, doc.getPath() + "#" + err.line);
-                                }
-                            }
-                        });
-                    }
-
-                    // Connect eval WebSocket for streaming query execution
-                    if (typeof eXide.wsEval !== "undefined" && eXide.wsEval.autoConnect) {
-                        eXide.wsEval.autoConnect();
-                    }
-
-                    // Fetch registered module prefixes for static analysis
-                    app.refreshModuleCache();
-
-                    if (afterInitCallback) {
-                        afterInitCallback(restored);
-                    }
-                    if (window._splashTimer) clearTimeout(window._splashTimer);
-                    if (eXide.configuration.allowGuest) {
-                        document.getElementById("splash").style.display = "none";
-                    } else {
-                        app.requireLogin(function() {
-                            document.getElementById("splash").style.display = "none";
-                        });
-                    }
-                });
-            });
-
-		    editor.addEventListener("outlineChange", app.onOutlineChange);
-            editor.validator.addEventListener("documentValid", function(doc) {
-                if (doc.isXQuery() && document.getElementById("live-preview").checked) {
-                    app.runQuery(doc.getPath(), true);
+            // Listen for pushed diagnostics from the server
+            eXide.ws.on("textDocument/publishDiagnostics", function (data) {
+              if (!data || !data.uri) return;
+              var doc = editor.getDocument(data.uri);
+              if (!doc) return;
+              var diagnostics = data.diagnostics;
+              if (!diagnostics || !Array.isArray(diagnostics) || diagnostics.length === 0) {
+                // Clear errors for this document
+                if (doc === editor.getActiveDocument()) {
+                  editor.updateStatus("");
+                  editor.clearErrors();
                 }
-            });
-            editor.addEventListener("saved", function(doc) {
-                if (document.getElementById("live-preview").checked && webResources[doc.getSyntax()]) {
-                    document.getElementById("results-iframe").contentDocument.location.reload(true);
-                }
-            });
-
-			window.addEventListener("resize", function() {
-			    app.updateLayoutTop();
-			    app.resize();
-			});
-
-			window.addEventListener("unload", function () {
-				app.saveState();
-			});
-		},
-
-        version: function() {
-            return document.getElementById("eXide-version").textContent;
-        },
-
-        hasFocus: function() {
-            return hasFocus;
-        },
-
-        getEditor: function() {
-            return editor;
-        },
-
-        getMenu: function() {
-            return menu;
-        },
-
-        refreshModuleCache: function() {
-            return fetch("api/editor/modules")
-                .then(function(r) { return r.json(); })
-                .then(function(modules) {
-                    if (Array.isArray(modules) && typeof staticAnalysis !== "undefined") {
-                        staticAnalysis.setRegisteredModules(modules);
-                    }
-                })
-                .catch(function() {});
-        },
-
-		updateAuthStatus: function(user) {
-		    var el = document.getElementById("user");
-		    if (user) {
-		        el.innerHTML = '<span class="auth-dot auth-dot-ok"></span>' + user;
-		        el.title = "Click to logout";
-		    } else {
-		        el.textContent = "Login";
-		        el.title = "Click to login";
-		    }
-		    // Start/stop monitor based on auth and panel visibility
-		    var eastEl = document.querySelector(".panel-east");
-		    var eastVisible = eastEl && eastEl.style.display !== "none";
-		    if (app.login && app.login.isAdmin && eastVisible) {
-		        if (!monitor) {
-		            monitor = new eXide.app.Monitor();
-		            monitor.init();
-		        }
-		        monitor.start();
-		    } else if (monitor) {
-		        monitor.stop();
-		    }
-		},
-
-		toggleMonitor: function() {
-		    if (!monitor) {
-		        monitor = new eXide.app.Monitor();
-		        monitor.init();
-		    }
-		    layout.toggle("east");
-		    var eastEl = document.querySelector(".panel-east");
-		    var isVisible = eastEl && eastEl.style.display !== "none";
-		    if (isVisible) {
-		        if (app.login && app.login.isAdmin) {
-		            monitor.start();
-		        } else {
-		            monitor.showMessage("The monitoring panel is only available to the admin user or users in the dba group.");
-		        }
-		    } else {
-		        monitor.stop();
-		    }
-		    app.$savePanelPrefs();
-		},
-
-		updateLayoutTop: function() {
-		    var toolbarBtns = document.querySelector(".toolbar-buttons");
-		    var layoutH = document.querySelector(".layout-horizontal");
-		    if (toolbarBtns && layoutH) {
-		        var fullscreen = document.getElementById("fullscreen");
-		        var top = toolbarBtns.getBoundingClientRect().bottom -
-		                  fullscreen.getBoundingClientRect().top + 2;
-		        layoutH.style.top = top + "px";
-		    }
-		},
-
-		resize: function(resizeIframe) {
-			var panel = document.getElementById("editor");
-            if (resizeIframe) {
-                var resultsContainer = document.querySelector(".panel-" + resultPanel);
-                var resultsBody = document.getElementById("results-body");
-                var navbarEl = resultsContainer.querySelector(".navbar");
-                var navbarHeight = navbarEl ? navbarEl.offsetHeight : 0;
-                document.getElementById("results-iframe").style.width = resultsBody.clientWidth + "px";
-                document.getElementById("results-iframe").style.height = (resultsContainer.clientHeight - navbarHeight - 8) + "px";
-                resultsBody.style.height = (resultsContainer.clientHeight - navbarHeight - 8) + "px";
-            }
-			editor.resize();
-		},
-
-        beforeResize: function() {
-            if (document.getElementById("serialization-mode").value == "html") {
-                document.getElementById("results-iframe").style.display = "none";
-            }
-        },
-
-        afterResize: function() {
-            editor.resize();
-            if (document.getElementById("serialization-mode").value == "html") {
-                document.getElementById("results-iframe").style.display = "";
-            }
-        },
-
-		newDocument: function(data, type) {
-			editor.newDocument(data, type);
-		},
-
-        newDocumentFromTemplate: function() {
-            dialogs["dialog-templates"].open();
-        },
-
-        dropFile: function(files) {
-            if (!allowDnd) {
                 return;
-            }
-            if (typeof FileReader !== "undefined") {
-                var reader = new FileReader();
-                for (var i = 0; i < files.length; i++) {
-                    var mime = eXide.util.mimeTypes.getLangFromMime(files[i].type) || "xquery";
-                    reader.onloadend = function(e) {
-                        app.newDocument(this.result, mime);
-                    };
-                    reader.readAsText(files[i]);
+              }
+              // Apply first error to the active document
+              if (doc === editor.getActiveDocument()) {
+                var err = diagnostics[0];
+                if (err && err.message) {
+                  editor.updateStatus(err.message, doc.getPath() + "#" + err.line);
                 }
-            } else {
-                util.message("Your browser does not support drag and drop of files.");
-            }
-        },
-
-		findDocument: function(path, line) {
-			var doc = editor.getDocument(path);
-			if (doc == null) {
-				var resource = {
-						name: path.match(/[^\/]+$/)[0],
-						path: path
-				};
-				app.$doOpenDocument(resource, function() {
-				    if (line) {
-        			    editorUtils.gotoLine(editor.editor, line);
-        			}
-				});
-			} else {
-				editor.switchTo(doc);
-				if (line) {
-    			    editorUtils.gotoLine(editor.editor, line);
-    			}
-			}
-		},
-
-		locate: function(type, path, symbol) {
-			if (path == null) {
-				editor.exec("locate", type, symbol);
-			} else {
-				var doc = editor.getDocument(path);
-				if (doc == null) {
-					var resource = {
-							name: path.match(/[^\/]+$/)[0],
-							path: path
-					};
-					app.$doOpenDocument(resource, function(doc) {
-                        if (doc) {
-                            editor.exec("locate", type, symbol);
-                        }
-					});
-				} else {
-					editor.switchTo(doc);
-					editor.exec("locate", type, symbol);
-				}
-			}
-		},
-
-		openDocument: function() {
-			dbBrowser.reload(["reload"], "open");
-			dialogs["open-dialog"].setTitle("Open Document");
-			dialogs["open-dialog"].setButtons({
-			    "Cancel": function() { dialogs["open-dialog"].close(); editor.focus(); },
-			    "Open": function(){ app.openSelectedDocument(null, true);}
-			});
-			dialogs["open-dialog"].open();
-		},
-
-		openSelectedDocument: function(doc, close) {
-			var resource = doc || dbBrowser.getSelection();
-			if (resource) {
-				app.$doOpenDocument(resource);
-			}
-			if (close == undefined || close)
-				dialogs["open-dialog"].close();
-		},
-
-        downloadSelectedResources: function(resources, close) {
-			if (resources) {
-                resources.forEach(resource => {
-                    app.download(resource.key);
-                })
-			}else {
-                util.Dialog.warning("Invalid selection","The Download Selected command requires that resources be selected. Please select resources for download.")
-            }
-			if (close == undefined || close)
-				dialogs["open-dialog"].close();
-		},
-
-		$doOpenDocument: function(resource, callback, reload, forceText) {
-			resource.path = util.normalizePath(resource.path);
-            var indentOnOpen = document.getElementById("indent-on-open").checked;
-            var expandXIncludesOnOpen = document.getElementById("expand-xincludes-on-open").checked;
-            var omitXMLDeclatarionOnOpen = document.getElementById("omit-xml-decl-on-open").checked;
-            var doc = editor.getDocument(resource.path);
-            if (doc && !reload) {
-                editor.switchTo(doc);
-                if (callback) {
-                    callback(resource);
-                }
-                return true;
-            }
-			var params = new URLSearchParams({
-			    "indent": indentOnOpen,
-			    "expand-xincludes": expandXIncludesOnOpen,
-			    "omit-xml-decl": omitXMLDeclatarionOnOpen
-			});
-			fetch(apiPath(resource.path) + "?" + params.toString())
-			    .then(function(response) {
-			        if (!response.ok) {
-			            throw { status: response.status, statusText: response.statusText };
-			        }
-			        return response.json();
-			    })
-			    .then(function(data) {
-			        var baseMime = data.mime || "";
-			        var externalPath = data.externalPath;
-			        // Show binary files in a preview overlay
-			        if (!reload && !forceText && data.binary &&
-			            /^image\/|^audio\/|^video\/|^application\/pdf|^application\/octet-stream|^application\/zip/.test(baseMime)) {
-			            var fileUrl = externalPath || ("rest" + resource.path);
-			            var fileName = resource.name || resource.path.replace(/^.*\//, "");
-			            app.$showBinaryPreview(fileUrl, fileName, baseMime, resource, callback);
-			            if (callback) { callback(null); }
-			            return true;
-			        }
-			        var content = data.content || "";
-			        if (reload) {
-			            editor.reload(content);
-			        } else {
-			            var mime = forceText ? "text/text" : util.mimeTypes.getMime(baseMime);
-			            editor.openDocument(content, mime, resource, externalPath);
-			        }
-			        if (callback) {
-			            callback(resource);
-			        }
-			        return true;
-			    })
-			    .catch(function(err) {
-			        util.error("Failed to load document " + encodeURI(resource.path) + ": " +
-			            (err.status || "") + " " + (err.statusText || err.message || ""));
-			        if (callback) {
-			            callback(null);
-			        }
-			        return false;
-			    });
-		},
-
-		$showBinaryPreview: function(fileUrl, fileName, mime, resource, callback) {
-		    // Remove existing overlay
-		    var existing = document.getElementById("binary-preview-overlay");
-		    if (existing) existing.remove();
-
-		    var overlay = document.createElement("div");
-		    overlay.id = "binary-preview-overlay";
-		    overlay.className = "binary-preview-overlay";
-
-		    var panel = document.createElement("div");
-		    panel.className = "binary-preview-panel";
-
-		    // Header
-		    var header = document.createElement("div");
-		    header.className = "binary-preview-header";
-		    var title = document.createElement("span");
-		    title.className = "binary-preview-title";
-		    title.textContent = fileName;
-		    title.title = fileName;
-		    header.appendChild(title);
-		    var closeBtn = document.createElement("button");
-		    closeBtn.className = "binary-preview-close";
-		    closeBtn.textContent = "\u2715";
-		    closeBtn.title = "Close";
-		    header.appendChild(closeBtn);
-		    panel.appendChild(header);
-
-		    // Content
-		    var content = document.createElement("div");
-		    content.className = "binary-preview-content";
-		    if (/^image\//.test(mime)) {
-		        var img = document.createElement("img");
-		        img.src = fileUrl;
-		        img.alt = fileName;
-		        content.appendChild(img);
-		    } else if (mime === "application/pdf") {
-		        var embed = document.createElement("embed");
-		        embed.src = fileUrl;
-		        embed.type = "application/pdf";
-		        embed.style.width = "100%";
-		        embed.style.height = "100%";
-		        content.appendChild(embed);
-		    } else if (/^audio\//.test(mime)) {
-		        var audio = document.createElement("audio");
-		        audio.src = fileUrl;
-		        audio.controls = true;
-		        content.appendChild(audio);
-		    } else if (/^video\//.test(mime)) {
-		        var video = document.createElement("video");
-		        video.src = fileUrl;
-		        video.controls = true;
-		        video.style.maxWidth = "100%";
-		        video.style.maxHeight = "100%";
-		        content.appendChild(video);
-		    } else {
-		        var msg = document.createElement("div");
-		        msg.className = "binary-preview-nopreview";
-		        msg.innerHTML = '<i class="fa fa-file-o" style="font-size:48px;margin-bottom:12px;display:block"></i>No preview available<br><small>' + mime + '</small>';
-		        content.appendChild(msg);
-		    }
-		    panel.appendChild(content);
-
-		    // Footer
-		    var footer = document.createElement("div");
-		    footer.className = "binary-preview-footer";
-		    var openBtn = document.createElement("button");
-		    openBtn.textContent = "Open in New Tab";
-		    openBtn.addEventListener("click", function() {
-		        window.open(fileUrl, fileName);
-		    });
-		    var dlBtn = document.createElement("button");
-		    dlBtn.textContent = "Download";
-		    dlBtn.addEventListener("click", function() {
-		        var a = document.createElement("a");
-		        a.href = fileUrl;
-		        a.download = fileName;
-		        a.click();
-		    });
-		    var openTextBtn = document.createElement("button");
-		    openTextBtn.textContent = "Open Anyway";
-		    openTextBtn.title = "Open as plain text in the editor";
-		    openTextBtn.addEventListener("click", function() {
-		        close();
-		        app.$doOpenDocument(resource, callback, false, true);
-		    });
-		    var cancelBtn = document.createElement("button");
-		    cancelBtn.textContent = "Close";
-		    cancelBtn.addEventListener("click", close);
-		    footer.appendChild(openTextBtn);
-		    footer.appendChild(openBtn);
-		    footer.appendChild(dlBtn);
-		    footer.appendChild(cancelBtn);
-		    panel.appendChild(footer);
-
-		    overlay.appendChild(panel);
-		    document.body.appendChild(overlay);
-
-		    function close() {
-		        overlay.remove();
-		    }
-		    closeBtn.addEventListener("click", close);
-		    overlay.addEventListener("click", function(e) {
-		        if (e.target === overlay) close();
-		    });
-		    document.addEventListener("keydown", function onKey(e) {
-		        if (e.key === "Escape") {
-		            close();
-		            document.removeEventListener("keydown", onKey);
-		        }
-		    });
-		},
-
-        reloadDocument: function() {
-            var doc = editor.getActiveDocument();
-            if (doc.isSaved()) {
-                app.$reloadDocument(doc);
-            } else {
-                util.Dialog.input("Reload Document", "Do you really want to reload the document?", function() {
-                    app.$reloadDocument(doc);
-                });
-            }
-        },
-
-        $reloadDocument: function(doc) {
-            var resource = {
-                name: doc.getName(),
-                path: doc.getPath()
-            };
-            app.$doOpenDocument(resource, null, true);
-        },
-
-		closeDocument: function() {
-			if (!editor.getActiveDocument().isSaved()) {
-				if (!dialogs["dialog-confirm-close"]) {
-				    dialogs["dialog-confirm-close"] = eXide.util.DialogManager.create(
-				        document.getElementById("dialog-confirm-close"), {
-				            appendTo: "#layout-container",
-				            title: "Close Document",
-				            modal: true,
-				            width: 420,
-				            buttons: {
-				                "Close": function() {
-				                    dialogs["dialog-confirm-close"].close();
-				                    editor.closeDocument();
-				                },
-				                "Cancel": function() {
-				                    dialogs["dialog-confirm-close"].close();
-				                }
-				            }
-				        }
-				    );
-				}
-				dialogs["dialog-confirm-close"].open();
-			} else {
-				editor.closeDocument();
-			}
-		},
-
-        closeAll: function() {
-            editor.forEachDocument(function(doc) {
-                if (doc.isSaved()) {
-                    editor.closeDocument(doc);
-                } else {
-                    util.message("Not closing unsaved document " + doc.getName());
-                }
+              }
             });
-        },
+          }
 
-		saveDocument: function() {
+          // Connect eval WebSocket for streaming query execution
+          if (typeof eXide.wsEval !== "undefined" && eXide.wsEval.autoConnect) {
+            eXide.wsEval.autoConnect();
+          }
+
+          // Fetch registered module prefixes for static analysis
+          app.refreshModuleCache();
+
+          if (afterInitCallback) {
+            afterInitCallback(restored);
+          }
+          if (window._splashTimer) clearTimeout(window._splashTimer);
+          if (eXide.configuration.allowGuest) {
+            document.getElementById("splash").style.display = "none";
+          } else {
             app.requireLogin(function () {
-                if (editor.getActiveDocument().getPath().match('^__new__')) {
-                    dbBrowser.changeToCollection("/db");
-        			dbBrowser.reload(["reload", "create"], "save");
-    				dialogs["open-dialog"].setTitle("Save Document");
-    				dialogs["open-dialog"].setButtons({
-    					"Cancel": function() {
-                            dialogs["open-dialog"].close();
-        				},
-    					"Save": function() {
-                            if(editor.getActiveDocument().isXQuery() && !/([^\s\\])*\.xq.?/.test(dbBrowser.getSelection().name)) {
-                                util.Dialog.warning("Failed to Save Document", "Your current file is an XQuery file, but you are trying to save it with a non-XQuery file extension (.xq, .xqm etc).  If you intended this to be another file type such as XML, copy and paste the content into a New file created using the \u201cNew\u201d button.");
-                                return;
-                            }
-
-    						editor.saveDocument(dbBrowser.getSelection(), function () {
-    							dialogs["open-dialog"].close();
-                                deploymentEditor.autoSync(editor.getActiveDocument().getBasePath());
-                                app.updateStatus(this);
-								app.syncDirectory(this.getBasePath())
-                                app.liveReload();
-    						}, function (msg) {
-    							util.Dialog.warning("Failed to Save Document", msg);
-    						});
-    					}
-    				});
-    				dialogs["open-dialog"].open();
-					var nameInput = document.querySelector("#open-dialog input[name='resource']");
-					if (nameInput) nameInput.focus();
-    			} else {
-    				editor.saveDocument(null, function () {
-    					util.message(editor.getActiveDocument().getName() + " stored.");
-                        deploymentEditor.autoSync(editor.getActiveDocument().getBasePath());
-                        app.liveReload();
-    				}, function (msg) {
-    					util.Dialog.warning("Failed to Save Document", msg);
-    				});
-    			}
+              document.getElementById("splash").style.display = "none";
             });
-		},
+          }
+        });
+      });
 
-        saveDocumentAs: function() {
-            app.requireLogin(function () {
-                if (editor.getActiveDocument().getPath().match('^__new__')) {
-                    dbBrowser.changeToCollection("/db");
-                }else {
-                    dbBrowser.changeToCollection(editor.getActiveDocument().getBasePath());
-                }
-                dbBrowser.reload(["reload", "create"], "save");
-    			dialogs["open-dialog"].setTitle("Save Document As ...");
-    			dialogs["open-dialog"].setButtons({
-    				"Cancel": function() {
-                        dialogs["open-dialog"].close();
-    				},
-    				"Save": function() {
-                         if(editor.getActiveDocument().isXQuery() && !/([^\s\\])*\.xq.?/.test(dbBrowser.getSelection().name)) {
-                            util.Dialog.warning("Failed to Save Document", "Your current file is an XQuery file, but you are trying to save it with a non-XQuery file extension (.xq, .xqm etc).  If you intended this to be another file type such as XML, copy and paste the content into a New file created using the \u201cNew\u201d button.");
-                            return;
-                        }
+      editor.addEventListener("outlineChange", app.onOutlineChange);
+      editor.validator.addEventListener("documentValid", function (doc) {
+        if (doc.isXQuery() && document.getElementById("live-preview").checked) {
+          app.runQuery(doc.getPath(), true);
+        }
+      });
+      editor.addEventListener("saved", function (doc) {
+        if (document.getElementById("live-preview").checked && webResources[doc.getSyntax()]) {
+          document.getElementById("results-iframe").contentDocument.location.reload(true);
+        }
+      });
 
-    					editor.saveDocument(dbBrowser.getSelection(), function () {
-    						dialogs["open-dialog"].close();
-                            deploymentEditor.autoSync(editor.getActiveDocument().getBasePath());
-                            app.updateStatus(this);
-							app.syncDirectory(this.getBasePath())
-                            app.liveReload();
-    					}, function (msg) {
-    						util.Dialog.warning("Failed to Save Document", msg);
-    					});
-    				}
-    			});
-    			dialogs["open-dialog"].open();
-				var nameInput = document.querySelector("#open-dialog input[name='resource']");
-				if (nameInput) nameInput.focus();
-            });
-        },
+      window.addEventListener("resize", function () {
+        app.updateLayoutTop();
+        app.resize();
+      });
 
-        exec: function() {
-            editor.exec(arguments);
-        },
+      window.addEventListener("unload", function () {
+        app.saveState();
+      });
+    },
 
-        download: function(path) {
-            var indentOnDownload = document.getElementById("indent-on-download").checked;
-            var expandXIncludesOnDownload = document.getElementById("expand-xincludes-on-download").checked;
-            var omitXMLDeclatarionOnDownload = document.getElementById("omit-xml-decl-on-download").checked;
-			var doc = editor.getActiveDocument();
-			if (!path && (doc.getPath().match("^__new__") || !doc.isSaved())) {
-				util.error("There are unsaved changes in the document. Please save it first.");
-				return;
-			}
-            var path = path || doc.getPath()
-            var dlParams = new URLSearchParams({
-                "download": "true",
-                "indent": indentOnDownload,
-                "expand-xincludes": expandXIncludesOnDownload,
-                "omit-xml-decl": omitXMLDeclatarionOnDownload
-            });
-            const url = apiPath(path) + "?" + dlParams.toString();
-            fetch(url)
-            .then(resp => resp.blob())
-            .then(blob => {
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = decodeURI(path.split("/").slice(-1)[0]);;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-            })
-		},
+    version: function () {
+      return document.getElementById("eXide-version").textContent;
+    },
 
-		runQuery: function(path, livePreview) {
-            function showResultsPanel() {
-                editor.updateStatus("");
-				editor.clearErrors();
-				app.showResultsPanel();
+    hasFocus: function () {
+      return hasFocus;
+    },
 
-				startOffset = 1;
-				currentOffset = 1;
-                activeResultIdx = -1;
+    getEditor: function () {
+      return editor;
+    },
+
+    getMenu: function () {
+      return menu;
+    },
+
+    refreshModuleCache: function () {
+      return fetch("api/editor/modules")
+        .then(function (r) {
+          return r.json();
+        })
+        .then(function (modules) {
+          if (Array.isArray(modules) && typeof staticAnalysis !== "undefined") {
+            staticAnalysis.setRegisteredModules(modules);
+          }
+        })
+        .catch(function () {});
+    },
+
+    updateAuthStatus: function (user) {
+      var el = document.getElementById("user");
+      if (user) {
+        el.innerHTML = '<span class="auth-dot auth-dot-ok"></span>' + user;
+        el.title = "Click to logout";
+      } else {
+        el.textContent = "Login";
+        el.title = "Click to login";
+      }
+      // Start/stop monitor based on auth and panel visibility
+      var eastEl = document.querySelector(".panel-east");
+      var eastVisible = eastEl && eastEl.style.display !== "none";
+      if (app.login && app.login.isAdmin && eastVisible) {
+        if (!monitor) {
+          monitor = new eXide.app.Monitor();
+          monitor.init();
+        }
+        monitor.start();
+      } else if (monitor) {
+        monitor.stop();
+      }
+    },
+
+    toggleMonitor: function () {
+      if (!monitor) {
+        monitor = new eXide.app.Monitor();
+        monitor.init();
+      }
+      layout.toggle("east");
+      var eastEl = document.querySelector(".panel-east");
+      var isVisible = eastEl && eastEl.style.display !== "none";
+      if (isVisible) {
+        if (app.login && app.login.isAdmin) {
+          monitor.start();
+        } else {
+          monitor.showMessage(
+            "The monitoring panel is only available to the admin user or users in the dba group."
+          );
+        }
+      } else {
+        monitor.stop();
+      }
+      app.$savePanelPrefs();
+    },
+
+    updateLayoutTop: function () {
+      var toolbarBtns = document.querySelector(".toolbar-buttons");
+      var layoutH = document.querySelector(".layout-horizontal");
+      if (toolbarBtns && layoutH) {
+        var fullscreen = document.getElementById("fullscreen");
+        var top =
+          toolbarBtns.getBoundingClientRect().bottom - fullscreen.getBoundingClientRect().top + 2;
+        layoutH.style.top = top + "px";
+      }
+    },
+
+    resize: function (resizeIframe) {
+      var panel = document.getElementById("editor");
+      if (resizeIframe) {
+        var resultsContainer = document.querySelector(".panel-" + resultPanel);
+        var resultsBody = document.getElementById("results-body");
+        var navbarEl = resultsContainer.querySelector(".navbar");
+        var navbarHeight = navbarEl ? navbarEl.offsetHeight : 0;
+        document.getElementById("results-iframe").style.width = resultsBody.clientWidth + "px";
+        document.getElementById("results-iframe").style.height =
+          resultsContainer.clientHeight - navbarHeight - 8 + "px";
+        resultsBody.style.height = resultsContainer.clientHeight - navbarHeight - 8 + "px";
+      }
+      editor.resize();
+    },
+
+    beforeResize: function () {
+      if (document.getElementById("serialization-mode").value == "html") {
+        document.getElementById("results-iframe").style.display = "none";
+      }
+    },
+
+    afterResize: function () {
+      editor.resize();
+      if (document.getElementById("serialization-mode").value == "html") {
+        document.getElementById("results-iframe").style.display = "";
+      }
+    },
+
+    newDocument: function (data, type) {
+      editor.newDocument(data, type);
+    },
+
+    newDocumentFromTemplate: function () {
+      dialogs["dialog-templates"].open();
+    },
+
+    dropFile: function (files) {
+      if (!allowDnd) {
+        return;
+      }
+      if (typeof FileReader !== "undefined") {
+        var reader = new FileReader();
+        for (var i = 0; i < files.length; i++) {
+          var mime = eXide.util.mimeTypes.getLangFromMime(files[i].type) || "xquery";
+          reader.onloadend = function (e) {
+            app.newDocument(this.result, mime);
+          };
+          reader.readAsText(files[i]);
+        }
+      } else {
+        util.message("Your browser does not support drag and drop of files.");
+      }
+    },
+
+    findDocument: function (path, line) {
+      var doc = editor.getDocument(path);
+      if (doc == null) {
+        var resource = {
+          name: path.match(/[^\/]+$/)[0],
+          path: path,
+        };
+        app.$doOpenDocument(resource, function () {
+          if (line) {
+            editorUtils.gotoLine(editor.editor, line);
+          }
+        });
+      } else {
+        editor.switchTo(doc);
+        if (line) {
+          editorUtils.gotoLine(editor.editor, line);
+        }
+      }
+    },
+
+    locate: function (type, path, symbol) {
+      if (path == null) {
+        editor.exec("locate", type, symbol);
+      } else {
+        var doc = editor.getDocument(path);
+        if (doc == null) {
+          var resource = {
+            name: path.match(/[^\/]+$/)[0],
+            path: path,
+          };
+          app.$doOpenDocument(resource, function (doc) {
+            if (doc) {
+              editor.exec("locate", type, symbol);
             }
+          });
+        } else {
+          editor.switchTo(doc);
+          editor.exec("locate", type, symbol);
+        }
+      }
+    },
 
-            if (!(eXide.configuration.allowExecution || app.login.isAdmin)) {
-                util.error("You are not allowed to execute XQuery code.");
+    openDocument: function () {
+      dbBrowser.reload(["reload"], "open");
+      dialogs["open-dialog"].setTitle("Open Document");
+      dialogs["open-dialog"].setButtons({
+        Cancel: function () {
+          dialogs["open-dialog"].close();
+          editor.focus();
+        },
+        Open: function () {
+          app.openSelectedDocument(null, true);
+        },
+      });
+      dialogs["open-dialog"].open();
+    },
+
+    openSelectedDocument: function (doc, close) {
+      var resource = doc || dbBrowser.getSelection();
+      if (resource) {
+        app.$doOpenDocument(resource);
+      }
+      if (close == undefined || close) dialogs["open-dialog"].close();
+    },
+
+    downloadSelectedResources: function (resources, close) {
+      if (resources) {
+        resources.forEach((resource) => {
+          app.download(resource.key);
+        });
+      } else {
+        util.Dialog.warning(
+          "Invalid selection",
+          "The Download Selected command requires that resources be selected. Please select resources for download."
+        );
+      }
+      if (close == undefined || close) dialogs["open-dialog"].close();
+    },
+
+    $doOpenDocument: function (resource, callback, reload, forceText) {
+      resource.path = util.normalizePath(resource.path);
+      var indentOnOpen = document.getElementById("indent-on-open").checked;
+      var expandXIncludesOnOpen = document.getElementById("expand-xincludes-on-open").checked;
+      var omitXMLDeclatarionOnOpen = document.getElementById("omit-xml-decl-on-open").checked;
+      var doc = editor.getDocument(resource.path);
+      if (doc && !reload) {
+        editor.switchTo(doc);
+        if (callback) {
+          callback(resource);
+        }
+        return true;
+      }
+      var params = new URLSearchParams({
+        indent: indentOnOpen,
+        "expand-xincludes": expandXIncludesOnOpen,
+        "omit-xml-decl": omitXMLDeclatarionOnOpen,
+      });
+      fetch(apiPath(resource.path) + "?" + params.toString())
+        .then(function (response) {
+          if (!response.ok) {
+            throw { status: response.status, statusText: response.statusText };
+          }
+          return response.json();
+        })
+        .then(function (data) {
+          var baseMime = data.mime || "";
+          var externalPath = data.externalPath;
+          // Show binary files in a preview overlay
+          if (
+            !reload &&
+            !forceText &&
+            data.binary &&
+            /^image\/|^audio\/|^video\/|^application\/pdf|^application\/octet-stream|^application\/zip/.test(
+              baseMime
+            )
+          ) {
+            var fileUrl = externalPath || "rest" + resource.path;
+            var fileName = resource.name || resource.path.replace(/^.*\//, "");
+            app.$showBinaryPreview(fileUrl, fileName, baseMime, resource, callback);
+            if (callback) {
+              callback(null);
+            }
+            return true;
+          }
+          var content = data.content || "";
+          if (reload) {
+            editor.reload(content);
+          } else {
+            var mime = forceText ? "text/text" : util.mimeTypes.getMime(baseMime);
+            editor.openDocument(content, mime, resource, externalPath);
+          }
+          if (callback) {
+            callback(resource);
+          }
+          return true;
+        })
+        .catch(function (err) {
+          util.error(
+            "Failed to load document " +
+              encodeURI(resource.path) +
+              ": " +
+              (err.status || "") +
+              " " +
+              (err.statusText || err.message || "")
+          );
+          if (callback) {
+            callback(null);
+          }
+          return false;
+        });
+    },
+
+    $showBinaryPreview: function (fileUrl, fileName, mime, resource, callback) {
+      // Remove existing overlay
+      var existing = document.getElementById("binary-preview-overlay");
+      if (existing) existing.remove();
+
+      var overlay = document.createElement("div");
+      overlay.id = "binary-preview-overlay";
+      overlay.className = "binary-preview-overlay";
+
+      var panel = document.createElement("div");
+      panel.className = "binary-preview-panel";
+
+      // Header
+      var header = document.createElement("div");
+      header.className = "binary-preview-header";
+      var title = document.createElement("span");
+      title.className = "binary-preview-title";
+      title.textContent = fileName;
+      title.title = fileName;
+      header.appendChild(title);
+      var closeBtn = document.createElement("button");
+      closeBtn.className = "binary-preview-close";
+      closeBtn.textContent = "\u2715";
+      closeBtn.title = "Close";
+      header.appendChild(closeBtn);
+      panel.appendChild(header);
+
+      // Content
+      var content = document.createElement("div");
+      content.className = "binary-preview-content";
+      if (/^image\//.test(mime)) {
+        var img = document.createElement("img");
+        img.src = fileUrl;
+        img.alt = fileName;
+        content.appendChild(img);
+      } else if (mime === "application/pdf") {
+        var embed = document.createElement("embed");
+        embed.src = fileUrl;
+        embed.type = "application/pdf";
+        embed.style.width = "100%";
+        embed.style.height = "100%";
+        content.appendChild(embed);
+      } else if (/^audio\//.test(mime)) {
+        var audio = document.createElement("audio");
+        audio.src = fileUrl;
+        audio.controls = true;
+        content.appendChild(audio);
+      } else if (/^video\//.test(mime)) {
+        var video = document.createElement("video");
+        video.src = fileUrl;
+        video.controls = true;
+        video.style.maxWidth = "100%";
+        video.style.maxHeight = "100%";
+        content.appendChild(video);
+      } else {
+        var msg = document.createElement("div");
+        msg.className = "binary-preview-nopreview";
+        msg.innerHTML =
+          '<i class="fa fa-file-o" style="font-size:48px;margin-bottom:12px;display:block"></i>No preview available<br><small>' +
+          mime +
+          "</small>";
+        content.appendChild(msg);
+      }
+      panel.appendChild(content);
+
+      // Footer
+      var footer = document.createElement("div");
+      footer.className = "binary-preview-footer";
+      var openBtn = document.createElement("button");
+      openBtn.textContent = "Open in New Tab";
+      openBtn.addEventListener("click", function () {
+        window.open(fileUrl, fileName);
+      });
+      var dlBtn = document.createElement("button");
+      dlBtn.textContent = "Download";
+      dlBtn.addEventListener("click", function () {
+        var a = document.createElement("a");
+        a.href = fileUrl;
+        a.download = fileName;
+        a.click();
+      });
+      var openTextBtn = document.createElement("button");
+      openTextBtn.textContent = "Open Anyway";
+      openTextBtn.title = "Open as plain text in the editor";
+      openTextBtn.addEventListener("click", function () {
+        close();
+        app.$doOpenDocument(resource, callback, false, true);
+      });
+      var cancelBtn = document.createElement("button");
+      cancelBtn.textContent = "Close";
+      cancelBtn.addEventListener("click", close);
+      footer.appendChild(openTextBtn);
+      footer.appendChild(openBtn);
+      footer.appendChild(dlBtn);
+      footer.appendChild(cancelBtn);
+      panel.appendChild(footer);
+
+      overlay.appendChild(panel);
+      document.body.appendChild(overlay);
+
+      function close() {
+        overlay.remove();
+      }
+      closeBtn.addEventListener("click", close);
+      overlay.addEventListener("click", function (e) {
+        if (e.target === overlay) close();
+      });
+      document.addEventListener("keydown", function onKey(e) {
+        if (e.key === "Escape") {
+          close();
+          document.removeEventListener("keydown", onKey);
+        }
+      });
+    },
+
+    reloadDocument: function () {
+      var doc = editor.getActiveDocument();
+      if (doc.isSaved()) {
+        app.$reloadDocument(doc);
+      } else {
+        util.Dialog.input(
+          "Reload Document",
+          "Do you really want to reload the document?",
+          function () {
+            app.$reloadDocument(doc);
+          }
+        );
+      }
+    },
+
+    $reloadDocument: function (doc) {
+      var resource = {
+        name: doc.getName(),
+        path: doc.getPath(),
+      };
+      app.$doOpenDocument(resource, null, true);
+    },
+
+    closeDocument: function () {
+      if (!editor.getActiveDocument().isSaved()) {
+        if (!dialogs["dialog-confirm-close"]) {
+          dialogs["dialog-confirm-close"] = eXide.util.DialogManager.create(
+            document.getElementById("dialog-confirm-close"),
+            {
+              appendTo: "#layout-container",
+              title: "Close Document",
+              modal: true,
+              width: 420,
+              buttons: {
+                Close: function () {
+                  dialogs["dialog-confirm-close"].close();
+                  editor.closeDocument();
+                },
+                Cancel: function () {
+                  dialogs["dialog-confirm-close"].close();
+                },
+              },
+            }
+          );
+        }
+        dialogs["dialog-confirm-close"].open();
+      } else {
+        editor.closeDocument();
+      }
+    },
+
+    closeAll: function () {
+      editor.forEachDocument(function (doc) {
+        if (doc.isSaved()) {
+          editor.closeDocument(doc);
+        } else {
+          util.message("Not closing unsaved document " + doc.getName());
+        }
+      });
+    },
+
+    saveDocument: function () {
+      app.requireLogin(function () {
+        if (editor.getActiveDocument().getPath().match("^__new__")) {
+          dbBrowser.changeToCollection("/db");
+          dbBrowser.reload(["reload", "create"], "save");
+          dialogs["open-dialog"].setTitle("Save Document");
+          dialogs["open-dialog"].setButtons({
+            Cancel: function () {
+              dialogs["open-dialog"].close();
+            },
+            Save: function () {
+              if (
+                editor.getActiveDocument().isXQuery() &&
+                !/([^\s\\])*\.xq.?/.test(dbBrowser.getSelection().name)
+              ) {
+                util.Dialog.warning(
+                  "Failed to Save Document",
+                  "Your current file is an XQuery file, but you are trying to save it with a non-XQuery file extension (.xq, .xqm etc).  If you intended this to be another file type such as XML, copy and paste the content into a New file created using the \u201cNew\u201d button."
+                );
                 return;
+              }
+
+              editor.saveDocument(
+                dbBrowser.getSelection(),
+                function () {
+                  dialogs["open-dialog"].close();
+                  deploymentEditor.autoSync(editor.getActiveDocument().getBasePath());
+                  app.updateStatus(this);
+                  app.syncDirectory(this.getBasePath());
+                  app.liveReload();
+                },
+                function (msg) {
+                  util.Dialog.warning("Failed to Save Document", msg);
+                }
+              );
+            },
+          });
+          dialogs["open-dialog"].open();
+          var nameInput = document.querySelector("#open-dialog input[name='resource']");
+          if (nameInput) nameInput.focus();
+        } else {
+          editor.saveDocument(
+            null,
+            function () {
+              util.message(editor.getActiveDocument().getName() + " stored.");
+              deploymentEditor.autoSync(editor.getActiveDocument().getBasePath());
+              app.liveReload();
+            },
+            function (msg) {
+              util.Dialog.warning("Failed to Save Document", msg);
             }
-            switch (editor.getActiveDocument().getSyntax()) {
-                case "html":
-                    showResultsPanel();
-                    var iframe = document.getElementById("results-iframe");
-                    iframe.style.display = "";
-                    if (path) {
-                        iframe.src = editor.getActiveDocument().getExternalLink();
-                    } else {
-                        iframe.contentDocument.documentElement.innerHTML = editor.getText();
-                    }
-                    document.getElementById("serialization-mode").setAttribute("disabled", "disabled");
-                    document.getElementById("serialization-mode").value = "html";
-                    break;
-                case "javascript":
-                    showResultsPanel();
-                    var iframe = document.getElementById("results-iframe");
-                    iframe.style.display = "";
-                    var code = editor.getText();
-                    code = "<script type=\"text/javascript\">" + code + "</script>";
-                    iframe.contentDocument.documentElement.innerHTML = code;
-                    document.getElementById("serialization-mode").setAttribute("disabled", "disabled");
-                    document.getElementById("serialization-mode").value = "html";
-                    break;
-                default:
-                    var code = editor.getText();
-                    if (path) {
-                        var doc = editor.getDocument(path);
-                        if (doc) {
-                            code = doc.getText();
-                        } else {
-                            return;
-                        }
-                    } else {
-                        lastQuery = editor.getActiveDocument().getPath();
-                    }
-        			eXide.util.message("Running query ...");
+          );
+        }
+      });
+    },
 
-                    document.getElementById("serialization-mode").removeAttribute("disabled");
-                    var serializationMode = document.getElementById("serialization-mode").value;
-        			var moduleLoadPath = "xmldb:exist://" + editor.getActiveDocument().getBasePath();
-        			document.querySelectorAll('.results-container .results').forEach(function(el) { el.innerHTML = ""; });
-
-                    app.runQueryCursor(code, moduleLoadPath, serializationMode, livePreview);
-                    break;
+    saveDocumentAs: function () {
+      app.requireLogin(function () {
+        if (editor.getActiveDocument().getPath().match("^__new__")) {
+          dbBrowser.changeToCollection("/db");
+        } else {
+          dbBrowser.changeToCollection(editor.getActiveDocument().getBasePath());
+        }
+        dbBrowser.reload(["reload", "create"], "save");
+        dialogs["open-dialog"].setTitle("Save Document As ...");
+        dialogs["open-dialog"].setButtons({
+          Cancel: function () {
+            dialogs["open-dialog"].close();
+          },
+          Save: function () {
+            if (
+              editor.getActiveDocument().isXQuery() &&
+              !/([^\s\\])*\.xq.?/.test(dbBrowser.getSelection().name)
+            ) {
+              util.Dialog.warning(
+                "Failed to Save Document",
+                "Your current file is an XQuery file, but you are trying to save it with a non-XQuery file extension (.xq, .xqm etc).  If you intended this to be another file type such as XML, copy and paste the content into a New file created using the \u201cNew\u201d button."
+              );
+              return;
             }
 
-		},
+            editor.saveDocument(
+              dbBrowser.getSelection(),
+              function () {
+                dialogs["open-dialog"].close();
+                deploymentEditor.autoSync(editor.getActiveDocument().getBasePath());
+                app.updateStatus(this);
+                app.syncDirectory(this.getBasePath());
+                app.liveReload();
+              },
+              function (msg) {
+                util.Dialog.warning("Failed to Save Document", msg);
+              }
+            );
+          },
+        });
+        dialogs["open-dialog"].open();
+        var nameInput = document.querySelector("#open-dialog input[name='resource']");
+        if (nameInput) nameInput.focus();
+      });
+    },
 
-		/** Active cursor ID for pagination. */
-		_cursorId: null,
+    exec: function () {
+      editor.exec(arguments);
+    },
 
-		/** AbortController for the in-flight query request. */
-		_queryAbort: null,
+    download: function (path) {
+      var indentOnDownload = document.getElementById("indent-on-download").checked;
+      var expandXIncludesOnDownload = document.getElementById(
+        "expand-xincludes-on-download"
+      ).checked;
+      var omitXMLDeclatarionOnDownload = document.getElementById(
+        "omit-xml-decl-on-download"
+      ).checked;
+      var doc = editor.getActiveDocument();
+      if (!path && (doc.getPath().match("^__new__") || !doc.isSaved())) {
+        util.error("There are unsaved changes in the document. Please save it first.");
+        return;
+      }
+      var path = path || doc.getPath();
+      var dlParams = new URLSearchParams({
+        download: "true",
+        indent: indentOnDownload,
+        "expand-xincludes": expandXIncludesOnDownload,
+        "omit-xml-decl": omitXMLDeclatarionOnDownload,
+      });
+      const url = apiPath(path) + "?" + dlParams.toString();
+      fetch(url)
+        .then((resp) => resp.blob())
+        .then((blob) => {
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.style.display = "none";
+          a.href = url;
+          a.download = decodeURI(path.split("/").slice(-1)[0]);
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+        });
+    },
 
-		/**
-		 * Execute query via server-side cursor (cursor:eval → cursor:fetch).
-		 *
-		 * POST ../existdb-openapi/api/query → { cursor, items, elapsed, timing }
-		 * GET  ../existdb-openapi/api/query/{id}/results?start=N&count=M → array of item maps
-		 *
-		 * Calls existdb-openapi directly (not eXide's own /api/query routes).
-		 * Cookie auth works because both apps share the org.exist.login domain.
-		 */
-		runQueryCursor: function(code, moduleLoadPath, serializationMode, livePreview) {
-		    var btnCancel = document.getElementById("cancel-query");
-		    var timingEl = document.getElementById("query-timing");
+    runQuery: function (path, livePreview) {
+      function showResultsPanel() {
+        editor.updateStatus("");
+        editor.clearErrors();
+        app.showResultsPanel();
 
-		    function showCancel() { if (btnCancel) btnCancel.style.display = ""; }
-		    function hideCancel() { if (btnCancel) btnCancel.style.display = "none"; }
+        startOffset = 1;
+        currentOffset = 1;
+        activeResultIdx = -1;
+      }
 
-		    function hideTiming() {
-		        if (timingEl) timingEl.style.display = "none";
-		    }
-
-		    // Close previous cursor if any
-		    if (app._cursorId) {
-		        fetch("../existdb-openapi/api/query/" + app._cursorId, { method: "DELETE" }).catch(function() {});
-		        app._cursorId = null;
-		    }
-
-		    // Abort any in-flight query
-		    if (app._queryAbort) {
-		        app._queryAbort.abort();
-		    }
-
-		    var abortController = new AbortController();
-		    app._queryAbort = abortController;
-
-		    showCancel();
-		    hideTiming();
-
-		    fetch("../existdb-openapi/api/query", {
-		        method: "POST",
-		        headers: { "Content-Type": "application/json" },
-		        body: JSON.stringify({ query: code, "module-load-path": moduleLoadPath }),
-		        signal: abortController.signal
-		    })
-		    .then(function(response) {
-		        app._queryAbort = null;
-		        hideCancel();
-		        if (!response.ok) {
-		            return response.json().then(function(err) {
-		                var msg = err.error || "Unknown error";
-		                if (err.line > 0) {
-		                    msg = "line " + err.line + ": " + msg;
-		                }
-		                editor.evalError(msg, !livePreview);
-		            });
-		        }
-		        return response.json().then(function(data) {
-		            app._cursorId = data.cursor;
-		            hitCount = data.items;
-		            endOffset = Math.min(numberOfResults, hitCount);
-
-		            editor.updateStatus("");
-		            editor.clearErrors();
-		            app.showResultsPanel();
-		            document.getElementById("results-iframe").style.display = "none";
-		            startOffset = 1;
-		            currentOffset = 1;
-		            activeResultIdx = -1;
-
-		            var elapsed = (data.elapsed / 1000).toFixed(3);
-		            util.message("Query returned " + hitCount.toLocaleString() + " item(s) in " + elapsed + "s");
-
-		            // Show timing breakdown
-		            if (timingEl) {
-		                var t = data.timing;
-		                if (t) {
-		                    timingEl.innerHTML =
-		                        '<span><span class="timing-label">Compile:</span> ' + t.compile + 'ms</span>' +
-		                        '<span><span class="timing-label">Eval:</span> ' + t.evaluate.toLocaleString() + 'ms</span>' +
-		                        '<span><span class="timing-label">Total:</span> ' + t.total.toLocaleString() + 'ms</span>' +
-		                        '<span><span class="timing-label">Items:</span> ' + hitCount.toLocaleString() + '</span>';
-		                } else {
-		                    timingEl.innerHTML =
-		                        '<span><span class="timing-label">Elapsed:</span> ' + data.elapsed + 'ms</span>' +
-		                        '<span><span class="timing-label">Items:</span> ' + hitCount.toLocaleString() + '</span>';
-		                }
-		                timingEl.style.display = "";
-		            }
-
-		            // Fetch first page
-		            app.fetchCursorPage(startOffset, endOffset);
-		        });
-		    })
-		    .catch(function(err) {
-		        app._queryAbort = null;
-		        hideCancel();
-		        if (err.name === "AbortError") {
-		            util.message("Query cancelled.");
-		            return;
-		        }
-		        util.error(err.message || String(err), "Server Error");
-		    });
-		},
-
-		/**
-		 * Fetch a page of results from the server-side cursor.
-		 * Each item includes value, type, documentURI, and nodeId.
-		 * Passes current serialization settings from the results toolbar.
-		 */
-		fetchCursorPage: function(start, end) {
-		    if (!app._cursorId) return;
-
-		    var count = end - start + 1;
-		    var serializationMode = document.getElementById("serialization-mode").value;
-		    var indent = document.getElementById("indent-results").checked ? "yes" : "no";
-		    var autoExpand = document.getElementById("auto-expand-matches").checked ? "both" : "no";
-		    var params = new URLSearchParams({
-		        start: start,
-		        count: count,
-		        method: serializationMode,
-		        indent: indent,
-		        "highlight-matches": autoExpand
-		    });
-
-		    fetch("../existdb-openapi/api/query/" + app._cursorId + "/results?" + params.toString())
-		    .then(function(response) {
-		        if (!response.ok) throw new Error("Cursor expired");
-		        return response.json();
-		    })
-		    .then(function(data) {
-		        var resultsDiv = document.querySelector('.results-container .results');
-		        if (!resultsDiv) return;
-		        resultsDiv.innerHTML = "";
-
-		        var items = data; // existdb-openapi returns a plain array
-		        if (!items || items.length === 0) return;
-
-		        var numWidth = Math.ceil(Math.log(hitCount + 1) / Math.LN10);
-		        for (var i = 0; i < items.length; i++) {
-		            var item = items[i];
-		            var idx = start + i;
-		            var div = document.createElement("div");
-		            div.className = (idx % 2 === 0) ? "even" : "uneven";
-
-		            // Build badge — clickable link if documentURI is available
-		            var badge;
-		            if (item.documentURI) {
-		                badge = '<a class="badge" href="#" data-path="' + item.documentURI +
-		                    '" title="Click to open source document" style="width:' + numWidth + 'ch">' + idx + '</a>';
-		            } else {
-		                badge = '<span class="badge" style="width:' + numWidth + 'ch">' + idx + '</span>';
-		            }
-
-		            div.innerHTML =
-		                '<div class="pos">' + badge + '</div>' +
-		                '<div class="item"><i class="fa fa-clipboard copy-result" title="Copy this item to clipboard"></i>' +
-		                '<div class="content" style="white-space: pre-wrap"></div></div>';
-
-		            var contentDiv = div.querySelector('.content');
-		            contentDiv.textContent = item.value;
-		            highlightResultContent(contentDiv);
-
-		            // Document link click handler
-		            var posLink = div.querySelector('.pos a');
-		            if (posLink) {
-		                posLink.addEventListener("click", function(e) {
-		                    e.preventDefault();
-		                    app.findDocument(this.dataset.path);
-		                });
-		            }
-
-		            // Copy button
-		            div.querySelector('.copy-result').addEventListener("click", function() {
-		                var sibling = this.parentNode.querySelector('.content');
-		                var text = sibling ? sibling.textContent : "";
-		                var btn = this;
-		                navigator.clipboard.writeText(text).then(function() {
-		                    btn.classList.remove('fa-clipboard');
-		                    btn.classList.add('fa-check', 'copied');
-		                    setTimeout(function() {
-		                        btn.classList.remove('fa-check', 'copied');
-		                        btn.classList.add('fa-clipboard');
-		                    }, 1200);
-		                });
-		            });
-
-		            resultsDiv.appendChild(div);
-		        }
-
-		        // Update status
-		        var actualEnd = start + items.length - 1;
-		        document.querySelectorAll('.results-container .current').forEach(function(el) {
-		            el.textContent = "Showing results " + start + " to " + actualEnd + " of " + hitCount;
-		        });
-
-		        // Update pagination state
-		        startOffset = start;
-		        currentOffset = actualEnd + 1;
-		        endOffset = actualEnd;
-		    })
-		    .catch(function(err) {
-		        util.error("Failed to fetch results: " + err.message);
-		    });
-		},
-
-		/** Cancel the active query. */
-		cancelQuery: function() {
-		    var code = editor.getText();
-		    // Detect queries that modify state: XQUF expressions, legacy update syntax,
-		    // xmldb store/remove/create, security manager changes, file system writes
-		    var hasSideEffects = /\b(update|insert|delete|replace|rename)\b/i.test(code) ||
-		        /\b(xmldb:(store|remove|create-collection|copy|move|rename))\b/.test(code) ||
-		        /\b(sm:(chmod|chown|chgrp|add-account|remove-account))\b/.test(code) ||
-		        /\b(file:(write|delete|move|mkdirs|serialize))\b/.test(code);
-
-		    function doCancel() {
-		        // 1. Abort the in-flight HTTP request (client-side only —
-		        //    drops the connection but the server query continues)
-		        if (app._queryAbort) {
-		            app._queryAbort.abort();
-		            app._queryAbort = null;
-		        }
-		        // 2. Try to kill the server-side query via admin endpoint.
-		        //    Only admins can call this; guest users just abort the HTTP connection.
-		        //    Fetch running queries and kill any that are user-submitted
-		        //    (exclude eXide's own internal API queries).
-		        fetch("api/admin/queries").then(function(r) { return r.json(); }).then(function(data) {
-		            var running = data.queries || [];
-		            for (var i = 0; i < running.length; i++) {
-		                var q = running[i];
-		                if (q.sourceKey && !q.sourceKey.includes("/apps/eXide/modules/")) {
-		                    fetch("api/admin/queries/" + encodeURIComponent(q.id), { method: "DELETE" });
-		                }
-		            }
-		        }).catch(function() {});
-
-		        var btnCancel = document.getElementById("cancel-query");
-		        if (btnCancel) btnCancel.style.display = "none";
-		        util.message("Query cancelled.");
-		    }
-
-		    if (hasSideEffects) {
-		        if (confirm(
-		            "This query contains expressions that modify the database " +
-		            "(update, store, delete, permissions, etc.).\n\n" +
-		            "Cancelling may leave the database in an inconsistent state " +
-		            "because partially applied changes cannot be rolled back.\n\n" +
-		            "Cancel anyway?"
-		        )) {
-		            doCancel();
-		        }
-		    } else {
-		        doCancel();
-		    }
-		},
-
-		checkQuery: function() {
-			editor.validator.triggerNow(editor.getActiveDocument());
-		},
-
-		/** If there are more query results to load, retrieve
-		 *  the next result.
-		 */
-		retrieveNext: function() {
-			console.log("retrieveNext: %d", currentOffset);
-		    if (currentOffset > 0 && currentOffset <= endOffset) {
-		        document.getElementById("serialization-mode").removeAttribute("disabled");
-		        var serializationMode = document.getElementById("serialization-mode").value;
-		        var autoExpandMatches = document.getElementById("auto-expand-matches").checked;
-		        var indentResults = document.getElementById("indent-results").checked;
-		        var url = 'results/' + currentOffset;
-				currentOffset++;
-				var params = new URLSearchParams({
-				    "output": serializationMode,
-				    "auto-expand-matches": autoExpandMatches,
-				    "indent": indentResults
-				});
-				fetch(url + "?" + params.toString())
-				    .then(function(response) {
-				        if (!response.ok) throw new Error(response.statusText);
-				        return response.text();
-				    })
-				    .then(function(data) {
-                        var temp = document.createElement("div");
-                        temp.innerHTML = data;
-                        var resultNode = temp.firstElementChild;
-                        if (resultNode) {
-                            var firstChild = resultNode.querySelector(":first-child");
-                            if (firstChild) {
-                                firstChild.style.width = (Math.ceil(Math.log(endOffset + 1) / Math.LN10)) + 'ch';
-                            }
-                            document.querySelectorAll('.results-container .results').forEach(function(el) {
-                                el.appendChild(resultNode);
-                            });
-                            var contentDiv = resultNode.querySelector('.content');
-                            if (contentDiv) {
-                                highlightResultContent(contentDiv);
-                            }
-                            document.querySelectorAll('.results-container .current').forEach(function(el) {
-                                el.textContent = 'Showing results ' + startOffset + ' to ' + (currentOffset - 1) + ' of ' + hitCount;
-                            });
-                            var posLinks = resultNode.querySelectorAll('.pos a');
-                            posLinks.forEach(function(link) {
-                                link.addEventListener("click", function(e) {
-                                    e.preventDefault();
-                                    app.findDocument(this.dataset.path);
-                                });
-                            });
-                            var copyBtns = resultNode.querySelectorAll('.copy-result');
-                            copyBtns.forEach(function(btn) {
-                                btn.addEventListener("click", function() {
-                                    var sibling = btn.parentNode.querySelector('.content');
-                                    var text = sibling ? sibling.textContent : "";
-                                    navigator.clipboard.writeText(text).then(function() {
-                                        btn.classList.remove('fa-clipboard');
-                                        btn.classList.add('fa-check', 'copied');
-                                        setTimeout(function() {
-                                            btn.classList.remove('fa-check', 'copied');
-                                            btn.classList.add('fa-clipboard');
-                                        }, 1200);
-                                    });
-                                });
-                            });
-                            app.retrieveNext();
-                        }
-				    });
-			} else {
-		    }
-		},
-
-		/** Called if user clicks on "forward" link in query results. */
-		browseNext: function() {
-			if (currentOffset > 0 && endOffset < hitCount) {
-				startOffset = currentOffset;
-		        var howmany = numberOfResults;
-		        endOffset = currentOffset + howmany - 1;
-				if (hitCount < endOffset)
-					endOffset = hitCount;
-				activeResultIdx = -1;
-				if (app._cursorId) {
-					app.fetchCursorPage(startOffset, endOffset);
-				} else {
-					document.querySelectorAll(".results-container .results").forEach(function(el) { el.innerHTML = ""; });
-					app.retrieveNext();
-				}
-			}
-			return false;
-		},
-
-		/** Called if user clicks on "previous" link in query results. */
-		browsePrevious: function() {
-			if (currentOffset > 0 && startOffset > 1) {
-		        var count = numberOfResults;
-		        startOffset = startOffset - count;
-				if (startOffset < 1)
-					startOffset = 1;
-				currentOffset = startOffset;
-				endOffset = currentOffset + (count - 1);
-				if (hitCount < endOffset)
-					endOffset = hitCount;
-				activeResultIdx = -1;
-				if (app._cursorId) {
-					app.fetchCursorPage(startOffset, endOffset);
-				} else {
-					document.querySelectorAll(".results-container .results").forEach(function(el) { el.innerHTML = ""; });
-					app.retrieveNext();
-				}
-			}
-			return false;
-		},
-
-		browseFirst: function() {
-			if (currentOffset > 0 && startOffset > 1) {
-				startOffset = 1;
-				currentOffset = 1;
-				endOffset = Math.min(numberOfResults, hitCount);
-				activeResultIdx = -1;
-				if (app._cursorId) {
-					app.fetchCursorPage(startOffset, endOffset);
-				} else {
-					document.querySelectorAll(".results-container .results").forEach(function(el) { el.innerHTML = ""; });
-					app.retrieveNext();
-				}
-			}
-			return false;
-		},
-
-		browseLast: function() {
-			if (currentOffset > 0 && endOffset < hitCount) {
-				startOffset = Math.floor((hitCount - 1) / numberOfResults) * numberOfResults + 1;
-				currentOffset = startOffset;
-				endOffset = hitCount;
-				activeResultIdx = -1;
-				if (app._cursorId) {
-					app.fetchCursorPage(startOffset, endOffset);
-				} else {
-					document.querySelectorAll(".results-container .results").forEach(function(el) { el.innerHTML = ""; });
-					app.retrieveNext();
-				}
-			}
-			return false;
-		},
-
-		syncDirectory : function(collection) {
-			editor.directory.reload(collection)
-		},
-
-		syncManager : function(collection) {
-			var openDialogEl = document.getElementById("open-dialog");
-			if(openDialogEl && openDialogEl.style.display !== "none" && openDialogEl.offsetParent !== null){
-				dbBrowser.resources.collection = collection
-				dbBrowser.resources.reload()
-			}
-		},
-
-		manage: function() {
-			app.requireLogin(function() {
-                dbBrowser.reload(["reload", "create", "upload", "properties", "open", "download", "cut", "copy", "paste"], "manage");
-                dialogs["open-dialog"].setTitle("DB Manager");
-                dialogs["open-dialog"].setButtons({
-                    "Close": function() { dialogs["open-dialog"].close(); }
-                });
-                dialogs["open-dialog"].open();
-			});
-		},
-
-		deploy: function() {
-            app.requireLogin(function() {
-    			var path = editor.getActiveDocument().getPath();
-    			var collection = /^(.*)\/[^\/]+$/.exec(path);
-    			if (!collection) {
-    				util.error("The file open in the editor does not belong to an application package!");
-    				return false;
-    			}
-    			console.log("Deploying application from collection: %s", collection[1]);
-    			deploymentEditor.deploy(collection[1]);
-            });
-			return false;
-		},
-
-		synchronize: function() {
-            app.requireLogin(function () {
-                var path = editor.getActiveDocument().getPath();
-        		var collection = /^(.*)\/[^\/]+$/.exec(path);
-    			if (!collection) {
-                    util.error("The file open in the editor does not belong to an application package!");
-    				return;
-    			}
-    			deploymentEditor.synchronize(collection[1]);
-            });
-		},
-
-        gitCheckout: function() {
-            app.requireLogin(function () {
-                var path = editor.getActiveDocument().getPath();
-        		var collection = /^(.*)\/[^\/]+$/.exec(path);
-    			if (!collection) {
-                    util.error("The file open in the editor does not belong to an application package!");
-    				return;
-    			}
-    			deploymentEditor.gitCheckout(collection[1]);
-            });
-		},
-        gitCommit: function() {
-            app.requireLogin(function () {
-                var path = editor.getActiveDocument().getPath();
-        		var collection = /^(.*)\/[^\/]+$/.exec(path);
-    			if (!collection) {
-                    util.error("The file open in the editor does not belong to an application package!");
-    				return;
-    			}
-    			deploymentEditor.gitCommit(collection[1]);
-            });
-		},
-
-        downloadApp: function () {
-            app.requireLogin(function() {
-                var path = editor.getActiveDocument().getPath();
-            	var collection = /^(.*)\/[^\/]+$/.exec(path);
-                console.log("downloading %s", collection);
-    			if (!collection) {
-                    util.error("The file open in the editor does not belong to an application package!");
-    				return;
-    			}
-    			deploymentEditor.download(collection[1]);
-            });
-        },
-
-		openApp: function (firstLoad) {
-			var path = editor.getActiveDocument().getPath();
-			var collection = /^(.*)\/[^\/]+$/.exec(path);
-			if (!collection) {
-                util.error("The file open in the editor does not belong to an application package!");
-				return;
-			}
-			deploymentEditor.runApp(collection[1], firstLoad);
-		},
-
-        runAppOrQuery: function() {
-            var doc = editor.getActiveDocument();
-            var project = projects.getProjectFor(doc.getPath());
-            if (project) {
-                var url = project.url.replace(/\/{2,}/, "/");
-                var link = eXide.configuration.context + url + "/";
-                app.ensureSaved(function() {
-                    project.win = window.open(link, project.abbrev);
-                    project.win.focus();
-                });
-            } else if (!doc.isNew() && (doc.getSyntax() == "xquery")) {
-                app.ensureSaved(function() {
-                    window.open(doc.getExternalLink(), doc.getName());
-                });
-            }
-        },
-
-        toggleRunStatus: function(doc) {
-            var project = projects.getProjectFor(doc.getPath());
-            var syntax = doc.getSyntax();
-            var enable = ((syntax == "xquery" || syntax == "html") && (project || !doc.isNew()));
-            document.getElementById("launch").disabled = !enable;
-            enable = (doc.getSyntax() == "xquery");
-            document.getElementById("run").disabled = !enable;
-        },
-
-        ensureSaved: function(callback) {
-            if (!editor.getActiveDocument().isSaved()) {
-                app.requireLogin(function () {
-                    eXide.util.Dialog.input("Save document?", "The current document has not been saved. Save now?", function() {
-                            editor.saveDocument(null, function () {
-                				util.message(editor.getActiveDocument().getName() + " stored.");
-                                callback();
-                			}, function (msg) {
-                				util.Dialog.warning("Failed to Save Document", msg);
-                			});
-                    });
-                });
+      if (!(eXide.configuration.allowExecution || app.login.isAdmin)) {
+        util.error("You are not allowed to execute XQuery code.");
+        return;
+      }
+      switch (editor.getActiveDocument().getSyntax()) {
+        case "html":
+          showResultsPanel();
+          var iframe = document.getElementById("results-iframe");
+          iframe.style.display = "";
+          if (path) {
+            iframe.src = editor.getActiveDocument().getExternalLink();
+          } else {
+            iframe.contentDocument.documentElement.innerHTML = editor.getText();
+          }
+          document.getElementById("serialization-mode").setAttribute("disabled", "disabled");
+          document.getElementById("serialization-mode").value = "html";
+          break;
+        case "javascript":
+          showResultsPanel();
+          var iframe = document.getElementById("results-iframe");
+          iframe.style.display = "";
+          var code = editor.getText();
+          code = '<script type="text/javascript">' + code + "</script>";
+          iframe.contentDocument.documentElement.innerHTML = code;
+          document.getElementById("serialization-mode").setAttribute("disabled", "disabled");
+          document.getElementById("serialization-mode").value = "html";
+          break;
+        default:
+          var code = editor.getText();
+          if (path) {
+            var doc = editor.getDocument(path);
+            if (doc) {
+              code = doc.getText();
             } else {
-                callback();
+              return;
             }
-        },
+          } else {
+            lastQuery = editor.getActiveDocument().getPath();
+          }
+          eXide.util.message("Running query ...");
 
-		restoreState: function(callback) {
-			if (!util.supportsHtml5Storage)
-				return false;
-			var sameVersion = preferences.read();
-			app.updateDarkModeIcon(preferences.get("theme"));
-			if (!sameVersion) {
-			    util.Dialog.message("Version Note", "It seems another version of eXide has been " +
-			        "used from this browser before. If you experience any display issues, please clear your browser's cache " +
-                    "(holding shift while clicking on the reload icon should usually be sufficient).");
-			}
-			layout.restoreState(sameVersion);
+          document.getElementById("serialization-mode").removeAttribute("disabled");
+          var serializationMode = document.getElementById("serialization-mode").value;
+          var moduleLoadPath = "xmldb:exist://" + editor.getActiveDocument().getBasePath();
+          document.querySelectorAll(".results-container .results").forEach(function (el) {
+            el.innerHTML = "";
+          });
 
-            var restoring = {};
+          app.runQueryCursor(code, moduleLoadPath, serializationMode, livePreview);
+          break;
+      }
+    },
 
-			var docCount = localStorage["eXide.documents"];
-			if (!docCount)
-				docCount = 0;
-            // we need to restore documents one after the other
-            var docsToLoad = [];
-			for (var i = 0; i < docCount; i++) {
-				var doc = {
-						path: localStorage["eXide." + i + ".path"],
-						name: localStorage["eXide." + i + ".name"],
-						writable: (localStorage["eXide." + i + ".writable"] == "true"),
-						line: parseInt(localStorage["eXide." + i + ".last-line"])
-				};
-				// New documents always editable (writable not stored for __new__ docs)
-				if (doc.path && doc.path.match(/^__new__/)) {
-					doc.writable = true;
-				}
-                if (!doc.name) {
-                    continue;
-                }
-				console.log("Restoring doc %s, going to line = %i", doc.path, doc.line);
-				var data = localStorage["eXide." + i + ".data"];
-				if (data) {
-					editor.newDocumentWithText(data, localStorage["eXide." + i + ".mime"], doc);
-				} else {
-                    docsToLoad.push(doc);
-				}
-                restoring[doc.path] = doc;
-			}
-            this.restoreDocs(docsToLoad, function() {
-                if (!editor.getActiveDocument()) {
-                    app.newDocument("", "xquery");
-                } else {
-                    var active = localStorage["eXide.activeTab"];
-                    if (active) {
-                        app.findDocument(active);
-                    }
-                }
-                editor.validator.triggerNow(editor.getActiveDocument());
-                if (callback) callback(restoring);
+    /** Active cursor ID for pagination. */
+    _cursorId: null,
+
+    /** AbortController for the in-flight query request. */
+    _queryAbort: null,
+
+    /**
+     * Execute query via server-side cursor (cursor:eval → cursor:fetch).
+     *
+     * POST ../existdb-openapi/api/query → { cursor, items, elapsed, timing }
+     * GET  ../existdb-openapi/api/query/{id}/results?start=N&count=M → array of item maps
+     *
+     * Calls existdb-openapi directly (not eXide's own /api/query routes).
+     * Cookie auth works because both apps share the org.exist.login domain.
+     */
+    runQueryCursor: function (code, moduleLoadPath, serializationMode, livePreview) {
+      var btnCancel = document.getElementById("cancel-query");
+      var timingEl = document.getElementById("query-timing");
+
+      function showCancel() {
+        if (btnCancel) btnCancel.style.display = "";
+      }
+      function hideCancel() {
+        if (btnCancel) btnCancel.style.display = "none";
+      }
+
+      function hideTiming() {
+        if (timingEl) timingEl.style.display = "none";
+      }
+
+      // Close previous cursor if any
+      if (app._cursorId) {
+        fetch("../existdb-openapi/api/query/" + app._cursorId, { method: "DELETE" }).catch(
+          function () {}
+        );
+        app._cursorId = null;
+      }
+
+      // Abort any in-flight query
+      if (app._queryAbort) {
+        app._queryAbort.abort();
+      }
+
+      var abortController = new AbortController();
+      app._queryAbort = abortController;
+
+      showCancel();
+      hideTiming();
+
+      fetch("../existdb-openapi/api/query", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: code, "module-load-path": moduleLoadPath }),
+        signal: abortController.signal,
+      })
+        .then(function (response) {
+          app._queryAbort = null;
+          hideCancel();
+          if (!response.ok) {
+            return response.json().then(function (err) {
+              var msg = err.error || "Unknown error";
+              if (err.line > 0) {
+                msg = "line " + err.line + ": " + msg;
+              }
+              editor.evalError(msg, !livePreview);
             });
-			deploymentEditor.restoreState();
+          }
+          return response.json().then(function (data) {
+            app._cursorId = data.cursor;
+            hitCount = data.items;
+            endOffset = Math.min(numberOfResults, hitCount);
 
-			return restoring;
-		},
+            editor.updateStatus("");
+            editor.clearErrors();
+            app.showResultsPanel();
+            document.getElementById("results-iframe").style.display = "none";
+            startOffset = 1;
+            currentOffset = 1;
+            activeResultIdx = -1;
 
-        restoreDocs: function(docs, callback) {
-            if (docs.length == 0) {
-                callback();
+            var elapsed = (data.elapsed / 1000).toFixed(3);
+            util.message(
+              "Query returned " + hitCount.toLocaleString() + " item(s) in " + elapsed + "s"
+            );
+
+            // Show timing breakdown
+            if (timingEl) {
+              var t = data.timing;
+              if (t) {
+                timingEl.innerHTML =
+                  '<span><span class="timing-label">Compile:</span> ' +
+                  t.compile +
+                  "ms</span>" +
+                  '<span><span class="timing-label">Eval:</span> ' +
+                  t.evaluate.toLocaleString() +
+                  "ms</span>" +
+                  '<span><span class="timing-label">Total:</span> ' +
+                  t.total.toLocaleString() +
+                  "ms</span>" +
+                  '<span><span class="timing-label">Items:</span> ' +
+                  hitCount.toLocaleString() +
+                  "</span>";
+              } else {
+                timingEl.innerHTML =
+                  '<span><span class="timing-label">Elapsed:</span> ' +
+                  data.elapsed +
+                  "ms</span>" +
+                  '<span><span class="timing-label">Items:</span> ' +
+                  hitCount.toLocaleString() +
+                  "</span>";
+              }
+              timingEl.style.display = "";
+            }
+
+            // Fetch first page
+            app.fetchCursorPage(startOffset, endOffset);
+          });
+        })
+        .catch(function (err) {
+          app._queryAbort = null;
+          hideCancel();
+          if (err.name === "AbortError") {
+            util.message("Query cancelled.");
+            return;
+          }
+          util.error(err.message || String(err), "Server Error");
+        });
+    },
+
+    /**
+     * Fetch a page of results from the server-side cursor.
+     * Each item includes value, type, documentURI, and nodeId.
+     * Passes current serialization settings from the results toolbar.
+     */
+    fetchCursorPage: function (start, end) {
+      if (!app._cursorId) return;
+
+      var count = end - start + 1;
+      var serializationMode = document.getElementById("serialization-mode").value;
+      var indent = document.getElementById("indent-results").checked ? "yes" : "no";
+      var autoExpand = document.getElementById("auto-expand-matches").checked ? "both" : "no";
+      var params = new URLSearchParams({
+        start: start,
+        count: count,
+        method: serializationMode,
+        indent: indent,
+        "highlight-matches": autoExpand,
+      });
+
+      fetch("../existdb-openapi/api/query/" + app._cursorId + "/results?" + params.toString())
+        .then(function (response) {
+          if (!response.ok) throw new Error("Cursor expired");
+          return response.json();
+        })
+        .then(function (data) {
+          var resultsDiv = document.querySelector(".results-container .results");
+          if (!resultsDiv) return;
+          resultsDiv.innerHTML = "";
+
+          var items = data; // existdb-openapi returns a plain array
+          if (!items || items.length === 0) return;
+
+          var numWidth = Math.ceil(Math.log(hitCount + 1) / Math.LN10);
+          for (var i = 0; i < items.length; i++) {
+            var item = items[i];
+            var idx = start + i;
+            var div = document.createElement("div");
+            div.className = idx % 2 === 0 ? "even" : "uneven";
+
+            // Build badge — clickable link if documentURI is available
+            var badge;
+            if (item.documentURI) {
+              badge =
+                '<a class="badge" href="#" data-path="' +
+                item.documentURI +
+                '" title="Click to open source document" style="width:' +
+                numWidth +
+                'ch">' +
+                idx +
+                "</a>";
+            } else {
+              badge = '<span class="badge" style="width:' + numWidth + 'ch">' + idx + "</span>";
+            }
+
+            div.innerHTML =
+              '<div class="pos">' +
+              badge +
+              "</div>" +
+              '<div class="item"><i class="fa fa-clipboard copy-result" title="Copy this item to clipboard"></i>' +
+              '<div class="content" style="white-space: pre-wrap"></div></div>';
+
+            var contentDiv = div.querySelector(".content");
+            contentDiv.textContent = item.value;
+            highlightResultContent(contentDiv);
+
+            // Document link click handler
+            var posLink = div.querySelector(".pos a");
+            if (posLink) {
+              posLink.addEventListener("click", function (e) {
+                e.preventDefault();
+                app.findDocument(this.dataset.path);
+              });
+            }
+
+            // Copy button
+            div.querySelector(".copy-result").addEventListener("click", function () {
+              var sibling = this.parentNode.querySelector(".content");
+              var text = sibling ? sibling.textContent : "";
+              var btn = this;
+              navigator.clipboard.writeText(text).then(function () {
+                btn.classList.remove("fa-clipboard");
+                btn.classList.add("fa-check", "copied");
+                setTimeout(function () {
+                  btn.classList.remove("fa-check", "copied");
+                  btn.classList.add("fa-clipboard");
+                }, 1200);
+              });
+            });
+
+            resultsDiv.appendChild(div);
+          }
+
+          // Update status
+          var actualEnd = start + items.length - 1;
+          document.querySelectorAll(".results-container .current").forEach(function (el) {
+            el.textContent = "Showing results " + start + " to " + actualEnd + " of " + hitCount;
+          });
+
+          // Update pagination state
+          startOffset = start;
+          currentOffset = actualEnd + 1;
+          endOffset = actualEnd;
+        })
+        .catch(function (err) {
+          util.error("Failed to fetch results: " + err.message);
+        });
+    },
+
+    /** Cancel the active query. */
+    cancelQuery: function () {
+      var code = editor.getText();
+      // Detect queries that modify state: XQUF expressions, legacy update syntax,
+      // xmldb store/remove/create, security manager changes, file system writes
+      var hasSideEffects =
+        /\b(update|insert|delete|replace|rename)\b/i.test(code) ||
+        /\b(xmldb:(store|remove|create-collection|copy|move|rename))\b/.test(code) ||
+        /\b(sm:(chmod|chown|chgrp|add-account|remove-account))\b/.test(code) ||
+        /\b(file:(write|delete|move|mkdirs|serialize))\b/.test(code);
+
+      function doCancel() {
+        // 1. Abort the in-flight HTTP request (client-side only —
+        //    drops the connection but the server query continues)
+        if (app._queryAbort) {
+          app._queryAbort.abort();
+          app._queryAbort = null;
+        }
+        // 2. Try to kill the server-side query via admin endpoint.
+        //    Only admins can call this; guest users just abort the HTTP connection.
+        //    Fetch running queries and kill any that are user-submitted
+        //    (exclude eXide's own internal API queries).
+        fetch("api/admin/queries")
+          .then(function (r) {
+            return r.json();
+          })
+          .then(function (data) {
+            var running = data.queries || [];
+            for (var i = 0; i < running.length; i++) {
+              var q = running[i];
+              if (q.sourceKey && !q.sourceKey.includes("/apps/eXide/modules/")) {
+                fetch("api/admin/queries/" + encodeURIComponent(q.id), { method: "DELETE" });
+              }
+            }
+          })
+          .catch(function () {});
+
+        var btnCancel = document.getElementById("cancel-query");
+        if (btnCancel) btnCancel.style.display = "none";
+        util.message("Query cancelled.");
+      }
+
+      if (hasSideEffects) {
+        if (
+          confirm(
+            "This query contains expressions that modify the database " +
+              "(update, store, delete, permissions, etc.).\n\n" +
+              "Cancelling may leave the database in an inconsistent state " +
+              "because partially applied changes cannot be rolled back.\n\n" +
+              "Cancel anyway?"
+          )
+        ) {
+          doCancel();
+        }
+      } else {
+        doCancel();
+      }
+    },
+
+    checkQuery: function () {
+      editor.validator.triggerNow(editor.getActiveDocument());
+    },
+
+    /** If there are more query results to load, retrieve
+     *  the next result.
+     */
+    retrieveNext: function () {
+      console.log("retrieveNext: %d", currentOffset);
+      if (currentOffset > 0 && currentOffset <= endOffset) {
+        document.getElementById("serialization-mode").removeAttribute("disabled");
+        var serializationMode = document.getElementById("serialization-mode").value;
+        var autoExpandMatches = document.getElementById("auto-expand-matches").checked;
+        var indentResults = document.getElementById("indent-results").checked;
+        var url = "results/" + currentOffset;
+        currentOffset++;
+        var params = new URLSearchParams({
+          output: serializationMode,
+          "auto-expand-matches": autoExpandMatches,
+          indent: indentResults,
+        });
+        fetch(url + "?" + params.toString())
+          .then(function (response) {
+            if (!response.ok) throw new Error(response.statusText);
+            return response.text();
+          })
+          .then(function (data) {
+            var temp = document.createElement("div");
+            temp.innerHTML = data;
+            var resultNode = temp.firstElementChild;
+            if (resultNode) {
+              var firstChild = resultNode.querySelector(":first-child");
+              if (firstChild) {
+                firstChild.style.width = Math.ceil(Math.log(endOffset + 1) / Math.LN10) + "ch";
+              }
+              document.querySelectorAll(".results-container .results").forEach(function (el) {
+                el.appendChild(resultNode);
+              });
+              var contentDiv = resultNode.querySelector(".content");
+              if (contentDiv) {
+                highlightResultContent(contentDiv);
+              }
+              document.querySelectorAll(".results-container .current").forEach(function (el) {
+                el.textContent =
+                  "Showing results " +
+                  startOffset +
+                  " to " +
+                  (currentOffset - 1) +
+                  " of " +
+                  hitCount;
+              });
+              var posLinks = resultNode.querySelectorAll(".pos a");
+              posLinks.forEach(function (link) {
+                link.addEventListener("click", function (e) {
+                  e.preventDefault();
+                  app.findDocument(this.dataset.path);
+                });
+              });
+              var copyBtns = resultNode.querySelectorAll(".copy-result");
+              copyBtns.forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                  var sibling = btn.parentNode.querySelector(".content");
+                  var text = sibling ? sibling.textContent : "";
+                  navigator.clipboard.writeText(text).then(function () {
+                    btn.classList.remove("fa-clipboard");
+                    btn.classList.add("fa-check", "copied");
+                    setTimeout(function () {
+                      btn.classList.remove("fa-check", "copied");
+                      btn.classList.add("fa-clipboard");
+                    }, 1200);
+                  });
+                });
+              });
+              app.retrieveNext();
+            }
+          });
+      } else {
+      }
+    },
+
+    /** Called if user clicks on "forward" link in query results. */
+    browseNext: function () {
+      if (currentOffset > 0 && endOffset < hitCount) {
+        startOffset = currentOffset;
+        var howmany = numberOfResults;
+        endOffset = currentOffset + howmany - 1;
+        if (hitCount < endOffset) endOffset = hitCount;
+        activeResultIdx = -1;
+        if (app._cursorId) {
+          app.fetchCursorPage(startOffset, endOffset);
+        } else {
+          document.querySelectorAll(".results-container .results").forEach(function (el) {
+            el.innerHTML = "";
+          });
+          app.retrieveNext();
+        }
+      }
+      return false;
+    },
+
+    /** Called if user clicks on "previous" link in query results. */
+    browsePrevious: function () {
+      if (currentOffset > 0 && startOffset > 1) {
+        var count = numberOfResults;
+        startOffset = startOffset - count;
+        if (startOffset < 1) startOffset = 1;
+        currentOffset = startOffset;
+        endOffset = currentOffset + (count - 1);
+        if (hitCount < endOffset) endOffset = hitCount;
+        activeResultIdx = -1;
+        if (app._cursorId) {
+          app.fetchCursorPage(startOffset, endOffset);
+        } else {
+          document.querySelectorAll(".results-container .results").forEach(function (el) {
+            el.innerHTML = "";
+          });
+          app.retrieveNext();
+        }
+      }
+      return false;
+    },
+
+    browseFirst: function () {
+      if (currentOffset > 0 && startOffset > 1) {
+        startOffset = 1;
+        currentOffset = 1;
+        endOffset = Math.min(numberOfResults, hitCount);
+        activeResultIdx = -1;
+        if (app._cursorId) {
+          app.fetchCursorPage(startOffset, endOffset);
+        } else {
+          document.querySelectorAll(".results-container .results").forEach(function (el) {
+            el.innerHTML = "";
+          });
+          app.retrieveNext();
+        }
+      }
+      return false;
+    },
+
+    browseLast: function () {
+      if (currentOffset > 0 && endOffset < hitCount) {
+        startOffset = Math.floor((hitCount - 1) / numberOfResults) * numberOfResults + 1;
+        currentOffset = startOffset;
+        endOffset = hitCount;
+        activeResultIdx = -1;
+        if (app._cursorId) {
+          app.fetchCursorPage(startOffset, endOffset);
+        } else {
+          document.querySelectorAll(".results-container .results").forEach(function (el) {
+            el.innerHTML = "";
+          });
+          app.retrieveNext();
+        }
+      }
+      return false;
+    },
+
+    syncDirectory: function (collection) {
+      editor.directory.reload(collection);
+    },
+
+    syncManager: function (collection) {
+      var openDialogEl = document.getElementById("open-dialog");
+      if (
+        openDialogEl &&
+        openDialogEl.style.display !== "none" &&
+        openDialogEl.offsetParent !== null
+      ) {
+        dbBrowser.resources.collection = collection;
+        dbBrowser.resources.reload();
+      }
+    },
+
+    manage: function () {
+      app.requireLogin(function () {
+        dbBrowser.reload(
+          ["reload", "create", "upload", "properties", "open", "download", "cut", "copy", "paste"],
+          "manage"
+        );
+        dialogs["open-dialog"].setTitle("DB Manager");
+        dialogs["open-dialog"].setButtons({
+          Close: function () {
+            dialogs["open-dialog"].close();
+          },
+        });
+        dialogs["open-dialog"].open();
+      });
+    },
+
+    deploy: function () {
+      app.requireLogin(function () {
+        var path = editor.getActiveDocument().getPath();
+        var collection = /^(.*)\/[^\/]+$/.exec(path);
+        if (!collection) {
+          util.error("The file open in the editor does not belong to an application package!");
+          return false;
+        }
+        console.log("Deploying application from collection: %s", collection[1]);
+        deploymentEditor.deploy(collection[1]);
+      });
+      return false;
+    },
+
+    synchronize: function () {
+      app.requireLogin(function () {
+        var path = editor.getActiveDocument().getPath();
+        var collection = /^(.*)\/[^\/]+$/.exec(path);
+        if (!collection) {
+          util.error("The file open in the editor does not belong to an application package!");
+          return;
+        }
+        deploymentEditor.synchronize(collection[1]);
+      });
+    },
+
+    gitCheckout: function () {
+      app.requireLogin(function () {
+        var path = editor.getActiveDocument().getPath();
+        var collection = /^(.*)\/[^\/]+$/.exec(path);
+        if (!collection) {
+          util.error("The file open in the editor does not belong to an application package!");
+          return;
+        }
+        deploymentEditor.gitCheckout(collection[1]);
+      });
+    },
+    gitCommit: function () {
+      app.requireLogin(function () {
+        var path = editor.getActiveDocument().getPath();
+        var collection = /^(.*)\/[^\/]+$/.exec(path);
+        if (!collection) {
+          util.error("The file open in the editor does not belong to an application package!");
+          return;
+        }
+        deploymentEditor.gitCommit(collection[1]);
+      });
+    },
+
+    downloadApp: function () {
+      app.requireLogin(function () {
+        var path = editor.getActiveDocument().getPath();
+        var collection = /^(.*)\/[^\/]+$/.exec(path);
+        console.log("downloading %s", collection);
+        if (!collection) {
+          util.error("The file open in the editor does not belong to an application package!");
+          return;
+        }
+        deploymentEditor.download(collection[1]);
+      });
+    },
+
+    openApp: function (firstLoad) {
+      var path = editor.getActiveDocument().getPath();
+      var collection = /^(.*)\/[^\/]+$/.exec(path);
+      if (!collection) {
+        util.error("The file open in the editor does not belong to an application package!");
+        return;
+      }
+      deploymentEditor.runApp(collection[1], firstLoad);
+    },
+
+    runAppOrQuery: function () {
+      var doc = editor.getActiveDocument();
+      var project = projects.getProjectFor(doc.getPath());
+      if (project) {
+        var url = project.url.replace(/\/{2,}/, "/");
+        var link = eXide.configuration.context + url + "/";
+        app.ensureSaved(function () {
+          project.win = window.open(link, project.abbrev);
+          project.win.focus();
+        });
+      } else if (!doc.isNew() && doc.getSyntax() == "xquery") {
+        app.ensureSaved(function () {
+          window.open(doc.getExternalLink(), doc.getName());
+        });
+      }
+    },
+
+    toggleRunStatus: function (doc) {
+      var project = projects.getProjectFor(doc.getPath());
+      var syntax = doc.getSyntax();
+      var enable = (syntax == "xquery" || syntax == "html") && (project || !doc.isNew());
+      document.getElementById("launch").disabled = !enable;
+      enable = doc.getSyntax() == "xquery";
+      document.getElementById("run").disabled = !enable;
+    },
+
+    ensureSaved: function (callback) {
+      if (!editor.getActiveDocument().isSaved()) {
+        app.requireLogin(function () {
+          eXide.util.Dialog.input(
+            "Save document?",
+            "The current document has not been saved. Save now?",
+            function () {
+              editor.saveDocument(
+                null,
+                function () {
+                  util.message(editor.getActiveDocument().getName() + " stored.");
+                  callback();
+                },
+                function (msg) {
+                  util.Dialog.warning("Failed to Save Document", msg);
+                }
+              );
+            }
+          );
+        });
+      } else {
+        callback();
+      }
+    },
+
+    restoreState: function (callback) {
+      if (!util.supportsHtml5Storage) return false;
+      var sameVersion = preferences.read();
+      app.updateDarkModeIcon(preferences.get("theme"));
+      if (!sameVersion) {
+        util.Dialog.message(
+          "Version Note",
+          "It seems another version of eXide has been " +
+            "used from this browser before. If you experience any display issues, please clear your browser's cache " +
+            "(holding shift while clicking on the reload icon should usually be sufficient)."
+        );
+      }
+      layout.restoreState(sameVersion);
+
+      var restoring = {};
+
+      var docCount = localStorage["eXide.documents"];
+      if (!docCount) docCount = 0;
+      // we need to restore documents one after the other
+      var docsToLoad = [];
+      for (var i = 0; i < docCount; i++) {
+        var doc = {
+          path: localStorage["eXide." + i + ".path"],
+          name: localStorage["eXide." + i + ".name"],
+          writable: localStorage["eXide." + i + ".writable"] == "true",
+          line: parseInt(localStorage["eXide." + i + ".last-line"]),
+        };
+        // New documents always editable (writable not stored for __new__ docs)
+        if (doc.path && doc.path.match(/^__new__/)) {
+          doc.writable = true;
+        }
+        if (!doc.name) {
+          continue;
+        }
+        console.log("Restoring doc %s, going to line = %i", doc.path, doc.line);
+        var data = localStorage["eXide." + i + ".data"];
+        if (data) {
+          editor.newDocumentWithText(data, localStorage["eXide." + i + ".mime"], doc);
+        } else {
+          docsToLoad.push(doc);
+        }
+        restoring[doc.path] = doc;
+      }
+      this.restoreDocs(docsToLoad, function () {
+        if (!editor.getActiveDocument()) {
+          app.newDocument("", "xquery");
+        } else {
+          var active = localStorage["eXide.activeTab"];
+          if (active) {
+            app.findDocument(active);
+          }
+        }
+        editor.validator.triggerNow(editor.getActiveDocument());
+        if (callback) callback(restoring);
+      });
+      deploymentEditor.restoreState();
+
+      return restoring;
+    },
+
+    restoreDocs: function (docs, callback) {
+      if (docs.length == 0) {
+        callback();
+        return;
+      }
+      var self = this;
+      var doc = docs.pop();
+      app.$doOpenDocument(doc, function () {
+        if (doc.line) {
+          editorUtils.gotoLine(editor.editor, doc.line + 1);
+        }
+        self.restoreDocs(docs, callback);
+      });
+    },
+
+    saveState: function () {
+      if (!util.supportsHtml5Storage || app._skipSaveState) return;
+      localStorage.clear();
+      preferences.save();
+      layout.saveState();
+
+      if (editor.getActiveDocument()) {
+        localStorage["eXide.activeTab"] = editor.getActiveDocument().path;
+      }
+      editor.saveState();
+      deploymentEditor.saveState();
+    },
+
+    getLogin: function (callback) {
+      fetch("api/auth/whoami")
+        .then(function (response) {
+          if (!response.ok) throw new Error(response.statusText);
+          return response.json();
+        })
+        .then(function (data) {
+          if (data && data.isLoggedIn) {
+            app.login = data;
+            app.updateAuthStatus(app.login.user);
+            if (callback) callback(app.login.user);
+          } else {
+            app.login = null;
+            app.updateAuthStatus(null);
+            if (callback) callback(null);
+          }
+        })
+        .catch(function (err) {
+          app.login = null;
+          app.updateAuthStatus(null);
+          if (callback) callback(null);
+        });
+    },
+
+    enforceLogin: function () {
+      app.requireLogin(function () {
+        if (!app.login || app.login.user === "guest") {
+          app.enforceLogin();
+        }
+      });
+    },
+
+    $checkLogin: function () {
+      if (app.login) return true;
+      util.error("Warning: you are not logged in.");
+      return false;
+    },
+
+    requireLogin: function (callback) {
+      if (!app.login) {
+        dialogs["login-dialog"]._onClose = function () {
+          if (app.login) {
+            callback();
+          } else {
+            util.error("Warning: you are not logged in!");
+          }
+        };
+        dialogs["login-dialog"].open();
+        var firstInput = document.querySelector("#login-dialog input:first-of-type");
+        if (firstInput) firstInput.focus();
+      } else callback();
+    },
+
+    showPreferences: function () {
+      preferences.show();
+    },
+
+    getPreference: function (key) {
+      return preferences.get(key);
+    },
+
+    startDebug: function () {
+      editor.exec("debug");
+    },
+
+    stepOver: function () {
+      editor.exec("stepOver");
+    },
+
+    stepInto: function () {
+      editor.exec("stepInto");
+    },
+
+    setTheme: function (theme) {
+      document.body.classList.toggle("dark", theme.isDark);
+    },
+
+    updateDarkModeIcon: function (themeOrResolved) {
+      var icon = document.querySelector("#toggle-dark-mode i");
+      if (!icon) return;
+      // Show sun when dark (click to go light), moon when light (click to go dark)
+      var isDark = themeOrResolved === "dark" || document.body.classList.contains("dark");
+      icon.className = isDark ? "fa fa-sun-o" : "fa fa-moon-o";
+    },
+
+    updateStatus: function (doc) {
+      var syntax = doc.getSyntax();
+      // Update status bar type segment
+      var typeLabels = {
+        text: "Text",
+        xml: "XML",
+        html: "HTML",
+        xquery: "XQuery",
+        javascript: "Javascript",
+        css: "CSS",
+        less: "Less",
+        json: "JSON",
+        markdown: "Markdown",
+      };
+      var typeVal = document.getElementById("status-type-value");
+      var label = typeLabels[syntax] || syntax;
+      if (syntax === "xquery" && doc.xqueryVersion) {
+        label += " " + doc.xqueryVersion;
+      }
+      if (typeVal) typeVal.textContent = label;
+      // Update popover active state
+      document.querySelectorAll("#type-popover .type-popover-item").forEach(function (el) {
+        el.classList.toggle("active", el.dataset.value === syntax);
+      });
+      var pathEl = document.querySelector("#status .path");
+      var pathText = doc.isNew() ? doc.getName() : decodeURI(util.normalizePath(doc.getPath()));
+      var copyBtn = document.getElementById("status-copy-url");
+      var extLink = doc.getExternalLink();
+      if (!extLink && !doc.isNew()) {
+        // Compute fallback external link from path
+        var ctx = eXide.configuration.context || "";
+        extLink = ctx + "/rest" + doc.getPath();
+      }
+      if (!doc.isNew() && extLink) {
+        if (pathEl.tagName !== "A") {
+          var a = document.createElement("a");
+          a.className = "path";
+          a.target = "_blank";
+          a.rel = "noopener";
+          pathEl.replaceWith(a);
+          pathEl = a;
+        }
+        pathEl.href = extLink;
+        pathEl.textContent = pathText;
+        pathEl.title = "Launch this saved resource in a new browser tab";
+        copyBtn.style.display = "";
+      } else {
+        if (pathEl.tagName !== "SPAN") {
+          var span = document.createElement("span");
+          span.className = "path";
+          pathEl.replaceWith(span);
+          pathEl = span;
+        }
+        pathEl.textContent = pathText;
+        copyBtn.style.display = "none";
+      }
+    },
+
+    showResultsPanel: function () {
+      layout.show(resultPanel, true);
+      app.resize(true);
+    },
+
+    toggleCollectionsPanel: function () {
+      layout.toggle("west");
+      app.$savePanelPrefs();
+      app.resize(true);
+    },
+
+    toggleResultsPanel: function () {
+      layout.toggle(resultPanel);
+      app.resize(true);
+    },
+
+    setWestPanel: function (visible) {
+      if (visible) {
+        layout.show("west", true);
+      } else {
+        layout.hide("west");
+      }
+      app.resize(true);
+    },
+
+    isWestPanelVisible: function () {
+      var el = document.querySelector(".panel-west");
+      return el && el.style.display !== "none" && el.offsetParent !== null;
+    },
+
+    setSouthPanel: function (visible) {
+      if (visible) {
+        layout.show(resultPanel, true);
+      } else {
+        layout.hide(resultPanel);
+      }
+      app.resize(true);
+    },
+
+    isSouthPanelVisible: function () {
+      var el = document.querySelector(".panel-" + resultPanel);
+      return el && el.style.display !== "none" && el.offsetParent !== null;
+    },
+
+    setEastPanel: function (visible) {
+      var eastEl = document.querySelector(".panel-east");
+      var isVisible = eastEl && eastEl.style.display !== "none";
+      if (visible && !isVisible) {
+        layout.show("east");
+        if (!monitor) {
+          monitor = new eXide.app.Monitor();
+          monitor.init();
+        }
+        if (app.login && app.login.isAdmin) {
+          monitor.start();
+        }
+      } else if (!visible && isVisible) {
+        layout.hide("east");
+        if (monitor) monitor.stop();
+      }
+      app.resize(true);
+    },
+
+    isEastPanelVisible: function () {
+      var el = document.querySelector(".panel-east");
+      return !!(el && el.style.display !== "none");
+    },
+
+    setCollectionsView: function (view) {
+      var treeView = document.getElementById("dir-tree-view");
+      var flatView = document.getElementById("dir-flat-view");
+      var toggleBtn = document.getElementById("toggle-dir-view");
+      var isFolder = view === "folder";
+      if (treeView) treeView.style.display = isFolder ? "none" : "";
+      if (flatView) flatView.style.display = isFolder ? "" : "none";
+      if (toggleBtn) {
+        toggleBtn.title = isFolder ? "Switch to tree view" : "Switch to folder view";
+        var icon = toggleBtn.querySelector("i");
+        if (icon) icon.className = isFolder ? "fa fa-sitemap" : "fa fa-folder-open-o";
+      }
+      if (editor && editor.directory && editor.directory.setFlatViewActive) {
+        editor.directory.setFlatViewActive(isFolder);
+      }
+    },
+
+    $savePanelPrefs: function () {
+      try {
+        var eastEl = document.querySelector(".panel-east");
+        var eastVisible = !!(eastEl && eastEl.style.display !== "none");
+        // Update both localStorage and the live preferences object
+        // so saveState's localStorage.clear() + preferences.save() preserves the value
+        preferences.preferences.showWestPanel = app.isWestPanelVisible();
+        preferences.preferences.showSouthPanel = app.isSouthPanelVisible();
+        preferences.preferences.showEastPanel = eastVisible;
+        preferences.save();
+      } catch (e) {}
+    },
+
+    initStatus: function (msg) {
+      document.getElementById("splash-status").textContent = msg;
+    },
+
+    git: (function () {
+      var unavailable = function () {
+        util.message("Git integration is not available in this version of eXide.");
+      };
+      return {
+        branch: unavailable,
+        command: unavailable,
+      };
+    })(),
+
+    findFiles: function () {
+      var doc = editor.getActiveDocument();
+      projects.findProject(doc.getBasePath(), function (app) {
+        eXide.find.Files.open(doc, app, function (searchParams) {
+          editor.updateStatus("");
+          editor.clearErrors();
+          startOffset = 1;
+          currentOffset = 1;
+
+          var iframe = document.getElementById("results-iframe");
+          iframe.style.display = "";
+          eXide.app.showResultsPanel();
+
+          iframe.contentWindow.document.open("text/html", "replace");
+          iframe.contentWindow.document.write("<html><body><p>Searching ...</p></body></html>");
+          iframe.contentWindow.document.close();
+
+          // Parse form params into JSON body for POST /api/search
+          var formParams = new URLSearchParams(searchParams);
+          var target = formParams.get("target");
+          var collection =
+            target === "all"
+              ? "/db"
+              : target === "collection"
+                ? formParams.get("collection")
+                : target || "/db";
+          var body = {
+            query: formParams.get("search"),
+            collection: collection,
+            type: formParams.get("type") || "all",
+            regex: formParams.has("regex"),
+            caseSensitive: formParams.has("case"),
+          };
+
+          fetch("api/search", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          })
+            .then(function (response) {
+              return response.json();
+            })
+            .then(function (data) {
+              if (data.error) {
+                iframe.contentWindow.document.open("text/html", "replace");
+                iframe.contentWindow.document.write(
+                  "<html><body><p>" + data.error + "</p></body></html>"
+                );
+                iframe.contentWindow.document.close();
                 return;
-            }
-            var self = this;
-            var doc = docs.pop();
-            app.$doOpenDocument(doc, function() {
-                if (doc.line) {
-                    editorUtils.gotoLine(editor.editor, doc.line + 1);
-                }
-                self.restoreDocs(docs, callback);
+              }
+              var hits = data.hits || [];
+              var html =
+                '<html><head><link rel="stylesheet" type="text/css" href="resources/css/search.css"/></head><body>';
+              html +=
+                "<div><h3>Search Results for " +
+                data.query +
+                " in " +
+                data.collection +
+                "</h3><ul>";
+              if (hits.length === 0) {
+                html += "<li>No matches found.</li>";
+              }
+              for (var i = 0; i < hits.length; i++) {
+                var hit = hits[i];
+                html +=
+                  '<li class="sourceinfo"><a class="resource" href="#" data-src="' +
+                  hit.resource +
+                  '" data-line="' +
+                  hit.line +
+                  '">' +
+                  hit.name +
+                  '</a><span class="line">line ' +
+                  hit.line +
+                  "</span></li>";
+                html +=
+                  '<li class="code">' +
+                  hit.text.replace(/&/g, "&amp;").replace(/</g, "&lt;") +
+                  "</li>";
+              }
+              html += "</ul></div></body></html>";
+              iframe.contentWindow.document.open("text/html", "replace");
+              iframe.contentWindow.document.write(html);
+              iframe.contentWindow.document.close();
+              // Bind click handlers
+              var links = iframe.contentDocument.querySelectorAll(".resource");
+              for (var j = 0; j < links.length; j++) {
+                links[j].addEventListener("click", function (ev) {
+                  ev.preventDefault();
+                  eXide.app.findDocument(this.dataset.src, parseInt(this.dataset.line));
+                });
+              }
             });
-        },
+        });
+      });
+    },
 
-		saveState: function() {
-			if (!util.supportsHtml5Storage || app._skipSaveState)
-				return;
-			localStorage.clear();
-			preferences.save();
-			layout.saveState();
+    liveReload: function () {
+      var doc = editor.getActiveDocument();
+      projects.findProject(doc.getBasePath(), function (project) {
+        if (project == null) {
+          return;
+        }
+        console.log("live reload: %s %s", project.liveReload, project.abbrev);
+        if (project.liveReload) {
+          var url = project.url.replace(/\/{2,}/, "/");
+          var link = eXide.configuration.context + url + "/";
+          project.win = window.open(link, project.abbrev);
+          if (project.win && !project.win.closed) {
+            project.win.location.reload();
+          } else {
+            console.log("app window not found: %s", project.abbrev);
+          }
+        }
+      });
+    },
 
-            if (editor.getActiveDocument()) {
-                localStorage["eXide.activeTab"] = editor.getActiveDocument().path;
-            }
-			editor.saveState();
-			deploymentEditor.saveState();
-		},
+    toggleLiveReload: function () {
+      var doc = editor.getActiveDocument();
+      projects.findProject(doc.getBasePath(), function (project) {
+        if (!project) {
+          return;
+        }
+        project.liveReload = !project.liveReload;
+        document
+          .querySelector("#menu-deploy-live span")
+          .setAttribute("class", project.liveReload ? "fa fa-check-square-o" : "fa fa-square-o");
+        if (project.liveReload && (!project.win || project.win.closed)) {
+          app.openApp(true);
+        }
+      });
+    },
 
-        getLogin: function(callback) {
-            fetch("api/auth/whoami")
-            .then(function(response) {
-                if (!response.ok) throw new Error(response.statusText);
-                return response.json();
+    initGUI: function (menu) {
+      resultPanel = "south";
+      layout = new app.Layout(editor);
+      layout.hide("east");
+
+      dialogs["open-dialog"] = eXide.util.DialogManager.create(
+        document.getElementById("open-dialog"),
+        {
+          appendTo: "#layout-container",
+          title: "Open file",
+          modal: false,
+          height: 480,
+          width: 640,
+        }
+      );
+      var openDialogEl = document.getElementById("open-dialog");
+      dialogs["open-dialog"].dialog.addEventListener("close", function () {});
+      var origOpenDialogOpen = dialogs["open-dialog"].open;
+      dialogs["open-dialog"].open = function () {
+        origOpenDialogOpen.call(dialogs["open-dialog"]);
+        dbBrowser.init();
+      };
+
+      dialogs["login-dialog"] = eXide.util.DialogManager.create(
+        document.getElementById("login-dialog"),
+        {
+          appendTo: "#layout-container",
+          title: "Login",
+          modal: true,
+          width: 360,
+        }
+      );
+      dialogs["login-dialog"]._onClose = null;
+      dialogs["login-dialog"].dialog.addEventListener("close", function () {
+        if (dialogs["login-dialog"]._onClose) {
+          dialogs["login-dialog"]._onClose();
+          dialogs["login-dialog"]._onClose = null;
+        }
+      });
+      dialogs["login-dialog"].setButtons({
+        Login: function () {
+          var user = document.querySelector('#login-form input[name="user"]').value;
+          var password = document.querySelector('#login-form input[name="password"]').value;
+          var formData = new URLSearchParams();
+          formData.append("user", user);
+          formData.append("password", password);
+          var durationEl = document.querySelector('#login-form input[name="duration"]');
+          if (durationEl && durationEl.checked) {
+            formData.append("duration", "P14D");
+          }
+          fetch("api/auth/session", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: formData.toString(),
+          })
+            .then(function (response) {
+              return response.json();
             })
-            .then(function(data) {
-                if (data && data.isLoggedIn) {
-                    app.login = data;
-                    app.updateAuthStatus(app.login.user);
-                    if (callback) callback(app.login.user);
-                } else {
-                    app.login = null;
-                    app.updateAuthStatus(null);
-                    if (callback) callback(null);
-                }
-            })
-            .catch(function(err) {
-                app.login = null;
-                app.updateAuthStatus(null);
-                if (callback) callback(null);
-            });
-        },
-
-        enforceLogin: function() {
-            app.requireLogin(function() {
-                if (!app.login || app.login.user === "guest") {
-                    app.enforceLogin();
-                }
-            });
-        },
-
-		$checkLogin: function () {
-			if (app.login)
-				return true;
-			util.error("Warning: you are not logged in.");
-			return false;
-		},
-
-        requireLogin: function(callback) {
-            if (!app.login) {
-                dialogs["login-dialog"]._onClose = function () {
-                    if (app.login) {
-                        callback();
-                    } else {
-                        util.error("Warning: you are not logged in!");
-                    }
-                };
-                dialogs["login-dialog"].open();
+            .then(function (data) {
+              if (!data.user) {
+                document.getElementById("login-error").textContent = "Login failed.";
                 var firstInput = document.querySelector("#login-dialog input:first-of-type");
                 if (firstInput) firstInput.focus();
-            } else
-                callback();
-        },
-
-        showPreferences: function() {
-            preferences.show();
-        },
-
-        getPreference: function(key) {
-            return preferences.get(key);
-        },
-
-        startDebug: function() {
-            editor.exec("debug");
-        },
-
-        stepOver: function() {
-            editor.exec("stepOver");
-        },
-
-        stepInto: function() {
-            editor.exec("stepInto");
-        },
-
-        setTheme: function(theme) {
-            document.body.classList.toggle("dark", theme.isDark);
-        },
-
-        updateDarkModeIcon: function(themeOrResolved) {
-            var icon = document.querySelector("#toggle-dark-mode i");
-            if (!icon) return;
-            // Show sun when dark (click to go light), moon when light (click to go dark)
-            var isDark = themeOrResolved === "dark" || document.body.classList.contains("dark");
-            icon.className = isDark ? "fa fa-sun-o" : "fa fa-moon-o";
-        },
-
-        updateStatus: function(doc) {
-            var syntax = doc.getSyntax();
-            // Update status bar type segment
-            var typeLabels = {text:"Text",xml:"XML",html:"HTML",xquery:"XQuery",javascript:"Javascript",css:"CSS",less:"Less",json:"JSON",markdown:"Markdown"};
-            var typeVal = document.getElementById("status-type-value");
-            var label = typeLabels[syntax] || syntax;
-            if (syntax === "xquery" && doc.xqueryVersion) {
-                label += " " + doc.xqueryVersion;
-            }
-            if (typeVal) typeVal.textContent = label;
-            // Update popover active state
-            document.querySelectorAll("#type-popover .type-popover-item").forEach(function(el) {
-                el.classList.toggle("active", el.dataset.value === syntax);
+              } else {
+                app.login = data;
+                console.log("Logged in as %o. Is dba: %s", data, app.login.isAdmin);
+                dialogs["login-dialog"].close();
+                app.updateAuthStatus(app.login.user);
+                editor.focus();
+              }
+            })
+            .catch(function (err) {
+              document.getElementById("login-error").textContent =
+                "Login failed. " + (err.message || "");
+              var firstInput = document.querySelector("#login-dialog input:first-of-type");
+              if (firstInput) firstInput.focus();
             });
-            var pathEl = document.querySelector("#status .path");
-            var pathText = doc.isNew() ? doc.getName() : decodeURI(util.normalizePath(doc.getPath()));
-            var copyBtn = document.getElementById("status-copy-url");
-            var extLink = doc.getExternalLink();
-            if (!extLink && !doc.isNew()) {
-                // Compute fallback external link from path
-                var ctx = eXide.configuration.context || "";
-                extLink = ctx + "/rest" + doc.getPath();
+        },
+        Cancel: function () {
+          dialogs["login-dialog"].close();
+          editor.focus();
+        },
+      });
+      var origLoginOpen = dialogs["login-dialog"].open;
+      dialogs["login-dialog"].open = function () {
+        origLoginOpen.call(dialogs["login-dialog"]);
+        var loginDialogEl = document.getElementById("login-dialog");
+        var inputs = loginDialogEl.querySelectorAll("input");
+        inputs.forEach(function (input) {
+          input.value = "";
+        });
+        var firstInput = loginDialogEl.querySelector("input:first-of-type");
+        if (firstInput) firstInput.focus();
+        document.getElementById("login-error").textContent = "";
+        inputs.forEach(function (input) {
+          input.addEventListener("keyup", function (e) {
+            if (e.keyCode == 13) {
+              var loginBtn = dialogs["login-dialog"].dialog.querySelector(
+                ".eXide-dialog-buttons button:first-of-type"
+              );
+              if (loginBtn) loginBtn.click();
             }
-            if (!doc.isNew() && extLink) {
-                if (pathEl.tagName !== "A") {
-                    var a = document.createElement("a");
-                    a.className = "path";
-                    a.target = "_blank";
-                    a.rel = "noopener";
-                    pathEl.replaceWith(a);
-                    pathEl = a;
-                }
-                pathEl.href = extLink;
-                pathEl.textContent = pathText;
-                pathEl.title = "Launch this saved resource in a new browser tab";
-                copyBtn.style.display = "";
-            } else {
-                if (pathEl.tagName !== "SPAN") {
-                    var span = document.createElement("span");
-                    span.className = "path";
-                    pathEl.replaceWith(span);
-                    pathEl = span;
-                }
-                pathEl.textContent = pathText;
-                copyBtn.style.display = "none";
+          });
+        });
+      };
+
+      dialogs["keyboard-help"] = eXide.util.DialogManager.create(
+        document.getElementById("keyboard-help"),
+        {
+          appendTo: "#layout-container",
+          title: "Keyboard Shortcuts",
+          modal: false,
+          height: 520,
+          width: 460,
+          buttons: {
+            Close: function () {
+              dialogs["keyboard-help"].close();
+            },
+          },
+        }
+      );
+      var origKbHelpOpen = dialogs["keyboard-help"].open;
+      dialogs["keyboard-help"].open = function () {
+        origKbHelpOpen.call(dialogs["keyboard-help"]);
+        eXide.edit.commands.help(document.getElementById("keyboard-help"), editor);
+      };
+
+      dialogs["about-dialog"] = eXide.util.DialogManager.create(
+        document.getElementById("about-dialog"),
+        {
+          appendTo: "#layout-container",
+          title: "About",
+          modal: false,
+          height: 300,
+          width: 450,
+          buttons: {
+            Close: function () {
+              dialogs["about-dialog"].close();
+            },
+          },
+        }
+      );
+      dialogs["dialog-templates"] = eXide.util.DialogManager.create(
+        document.getElementById("dialog-templates"),
+        {
+          appendTo: "#layout-container",
+          title: "New Document",
+          modal: false,
+          height: 280,
+          width: 550,
+          buttons: {
+            Cancel: function () {
+              dialogs["dialog-templates"].close();
+              editor.focus();
+            },
+            Create: function () {
+              var templEl = document.getElementById("dialog-templates");
+              var mode = templEl.querySelector(".type-select").value;
+              var template = templEl.querySelector(".templates select").value;
+              console.log("creating new doc with mode: %s and template: %s", mode, template);
+              editor.newDocumentFromTemplate(mode, template);
+              dialogs["dialog-templates"].close();
+              editor.focus();
+            },
+          },
+        }
+      );
+      var origTemplOpen = dialogs["dialog-templates"].open;
+      dialogs["dialog-templates"].open = function () {
+        origTemplOpen.call(dialogs["dialog-templates"]);
+        fetch("api/templates")
+          .then(function (response) {
+            return response.json();
+          })
+          .then(function (data) {
+            templates = data;
+            var templatesDiv = document.querySelector("#dialog-templates .templates");
+            if (templatesDiv) templatesDiv.style.display = "none";
+            var typeSelect = document.querySelector("#dialog-templates .type-select");
+            if (typeSelect) {
+              typeSelect.value = "xquery";
+              typeSelect.dispatchEvent(new Event("change"));
+              typeSelect.focus();
             }
-        },
-
-        showResultsPanel: function() {
-			layout.show(resultPanel, true);
-			app.resize(true);
-        },
-
-        toggleCollectionsPanel: function() {
-            layout.toggle("west");
-            app.$savePanelPrefs();
-            app.resize(true);
-        },
-
-        toggleResultsPanel: function() {
-            layout.toggle(resultPanel);
-			app.resize(true);
-        },
-
-        setWestPanel: function(visible) {
-            if (visible) {
-                layout.show("west", true);
-            } else {
-                layout.hide("west");
+          });
+      };
+      document
+        .querySelector("#dialog-templates .type-select")
+        .addEventListener("change", function () {
+          var templ = document.querySelector("#dialog-templates .templates");
+          var templSel = templ.querySelector("select");
+          var type = this.value;
+          templSel.innerHTML = "";
+          var mode = templates[type];
+          if (mode) {
+            var options = "<option value=''>None</option>";
+            for (var i = 0; i < mode.length; i++) {
+              options +=
+                "<option value='" + mode[i].name + "'>" + mode[i].description + "</option>";
             }
-            app.resize(true);
-        },
+            templSel.innerHTML = options;
+            templ.style.display = "";
+          } else {
+            templ.style.display = "none";
+          }
+        });
 
-        isWestPanelVisible: function() {
-            var el = document.querySelector(".panel-west");
-            return el && el.style.display !== "none" && el.offsetParent !== null;
-        },
+      // initialize buttons and menu events
+      var btnOpen = document.getElementById("open");
+      btnOpen.addEventListener("click", app.openDocument);
+      menu.click("#menu-file-open", app.openDocument);
 
-        setSouthPanel: function(visible) {
-            if (visible) {
-                layout.show(resultPanel, true);
-            } else {
-                layout.hide(resultPanel);
-            }
-            app.resize(true);
-        },
+      var btnClose = document.getElementById("close");
+      btnClose.addEventListener("click", app.closeDocument);
+      menu.click("#menu-file-close", app.closeDocument);
 
-        isSouthPanelVisible: function() {
-            var el = document.querySelector(".panel-" + resultPanel);
-            return el && el.style.display !== "none" && el.offsetParent !== null;
-        },
+      menu.click("#menu-file-close-all", app.closeAll);
 
-        setEastPanel: function(visible) {
-            var eastEl = document.querySelector(".panel-east");
-            var isVisible = eastEl && eastEl.style.display !== "none";
-            if (visible && !isVisible) {
-                layout.show("east");
-                if (!monitor) {
-                    monitor = new eXide.app.Monitor();
-                    monitor.init();
-                }
-                if (app.login && app.login.isAdmin) {
-                    monitor.start();
-                }
-            } else if (!visible && isVisible) {
-                layout.hide("east");
-                if (monitor) monitor.stop();
-            }
-            app.resize(true);
-        },
+      var btnNew = document.getElementById("new");
+      btnNew.addEventListener("click", function () {
+        app.newDocumentFromTemplate();
+      });
 
-        isEastPanelVisible: function() {
-            var el = document.querySelector(".panel-east");
-            return !!(el && el.style.display !== "none");
-        },
+      var btnNewXquery = document.getElementById("new-xquery");
+      btnNewXquery.addEventListener("click", function () {
+        app.newDocument(null, "xquery");
+      });
+      menu.click("#menu-file-new", app.newDocumentFromTemplate);
+      menu.click("#menu-file-new-xquery", function () {
+        app.newDocument(null, "xquery");
+      });
 
-        setCollectionsView: function(view) {
-            var treeView = document.getElementById("dir-tree-view");
-            var flatView = document.getElementById("dir-flat-view");
-            var toggleBtn = document.getElementById("toggle-dir-view");
-            var isFolder = (view === "folder");
-            if (treeView) treeView.style.display = isFolder ? "none" : "";
-            if (flatView) flatView.style.display = isFolder ? "" : "none";
-            if (toggleBtn) {
-                toggleBtn.title = isFolder ? "Switch to tree view" : "Switch to folder view";
-                var icon = toggleBtn.querySelector("i");
-                if (icon) icon.className = isFolder ? "fa fa-sitemap" : "fa fa-folder-open-o";
-            }
-            if (editor && editor.directory && editor.directory.setFlatViewActive) {
-                editor.directory.setFlatViewActive(isFolder);
-            }
-        },
+      var btnRun = document.getElementById("run");
+      btnRun.disabled = true;
+      btnRun.addEventListener("click", function (ev) {
+        app.runQuery();
+      });
 
-        $savePanelPrefs: function() {
-            try {
-                var eastEl = document.querySelector(".panel-east");
-                var eastVisible = !!(eastEl && eastEl.style.display !== "none");
-                // Update both localStorage and the live preferences object
-                // so saveState's localStorage.clear() + preferences.save() preserves the value
-                preferences.preferences.showWestPanel = app.isWestPanelVisible();
-                preferences.preferences.showSouthPanel = app.isSouthPanelVisible();
-                preferences.preferences.showEastPanel = eastVisible;
-                preferences.save();
-            } catch(e) {}
-        },
+      var btnCancel = document.getElementById("cancel-query");
+      if (btnCancel) {
+        btnCancel.addEventListener("click", function () {
+          app.cancelQuery();
+        });
+      }
 
-        initStatus: function(msg) {
-            document.getElementById("splash-status").textContent = msg;
-        },
+      var btnLaunch = document.getElementById("launch");
+      btnLaunch.addEventListener("click", function (ev) {
+        app.runAppOrQuery();
+      });
 
-        git: function() {
-            var unavailable = function() {
-                util.message("Git integration is not available in this version of eXide.");
+      var statusCursor = document.getElementById("status-cursor");
+      if (statusCursor) {
+        statusCursor.style.cursor = "pointer";
+        statusCursor.title = "Go to Line";
+        statusCursor.addEventListener("click", function () {
+          editor.gotoLine();
+        });
+      }
+
+      document.getElementById("status-copy-url").addEventListener("click", function () {
+        var pathEl = document.querySelector("#status .path");
+        var path = pathEl ? pathEl.textContent : null;
+        if (path) {
+          navigator.clipboard.writeText(path).then(function () {
+            app.showMessage("Path copied to clipboard");
+          });
+        }
+      });
+
+      var btnToggleSplitPane = document.getElementById("toggle-split-pane");
+      if (btnToggleSplitPane) {
+        btnToggleSplitPane.addEventListener("click", function () {
+          var prefs = preferences.preferences;
+          prefs.splitPane = !prefs.splitPane;
+          var pw = document.querySelector(".panel-west");
+          if (pw) {
+            pw.classList.toggle("split-pane", prefs.splitPane);
+          }
+          btnToggleSplitPane.setAttribute("aria-pressed", prefs.splitPane ? "true" : "false");
+          btnToggleSplitPane.textContent = prefs.splitPane ? "\u229E" : "\u229F";
+          if (prefs.splitPane) {
+            editor.outline.toggle(true);
+            editor.directory.toggle(true);
+          } else {
+            // Restore tabbed mode: activate whichever tab is marked active
+            var tabs = document.querySelectorAll("#tabs-outline a.tab");
+            var activeIndex = 0;
+            tabs.forEach(function (t, i) {
+              if (t.classList.contains("active")) activeIndex = i;
+            });
+            editor.directory.toggle(activeIndex === 0);
+            editor.outline.toggle(activeIndex === 1);
+          }
+          preferences.save();
+        });
+      }
+
+      var btnToggleOutline = document.getElementById("toggle-outline");
+      if (btnToggleOutline) {
+        btnToggleOutline.addEventListener("click", function () {
+          layout.toggle("west");
+          app.$savePanelPrefs();
+        });
+      }
+      var btnToggleResults = document.getElementById("toggle-results");
+      if (btnToggleResults) {
+        btnToggleResults.addEventListener("click", function () {
+          layout.toggle(resultPanel);
+          app.$savePanelPrefs();
+        });
+      }
+
+      var btnToggleMonitor = document.getElementById("toggle-monitor");
+      if (btnToggleMonitor) {
+        btnToggleMonitor.addEventListener("click", function () {
+          app.toggleMonitor();
+        });
+      }
+
+      var btnMonitorClose = document.getElementById("monitor-close");
+      if (btnMonitorClose) {
+        btnMonitorClose.addEventListener("click", function () {
+          app.toggleMonitor();
+        });
+      }
+
+      // delegate kill buttons in monitor
+      var monRunning = document.getElementById("mon-running-body");
+      if (monRunning) {
+        monRunning.addEventListener("click", function (ev) {
+          var btn = ev.target.closest(".mon-kill");
+          if (btn && monitor) {
+            monitor.killQuery(btn.dataset.id);
+          }
+        });
+      }
+
+      var btnDebug = document.getElementById("debug");
+      if (btnDebug) btnDebug.addEventListener("click", app.startDebug);
+
+      var btnStepOver = document.querySelector("#debug-actions #step-over");
+      if (btnStepOver) btnStepOver.addEventListener("click", app.stepOver);
+
+      var btnStepInto = document.querySelector("#debug-actions #step-into");
+      if (btnStepInto) btnStepInto.addEventListener("click", app.stepInto);
+
+      var btnStepOut = document.querySelector("#debug-actions #step-out");
+      if (btnStepOut) btnStepOut.addEventListener("click", app.startDebug);
+
+      var btnValidate = document.getElementById("validate");
+      if (btnValidate) btnValidate.addEventListener("click", app.checkQuery);
+
+      var btnSave = document.getElementById("save");
+      btnSave.addEventListener("click", app.saveDocument);
+      menu.click("#menu-file-save", app.saveDocument);
+      menu.click("#menu-file-save-as", app.saveDocumentAs);
+
+      menu.click("#menu-file-reload", app.reloadDocument);
+
+      menu.click("#menu-file-download", app.download);
+      menu.click("#menu-file-manager", app.manage);
+      // menu-only events
+      menu.click("#menu-deploy-new", app.newDeployment);
+      menu.click("#menu-deploy-edit", app.deploymentSettings);
+      menu.click("#menu-deploy-live", app.toggleLiveReload);
+      menu.click("#menu-deploy-sync", app.synchronize);
+      menu.click("#menu-deploy-download", app.downloadApp);
+
+      menu.click("#menu-git-checkout", app.gitCheckout);
+      menu.click("#menu-git-commit", app.gitCommit);
+
+      menu.click("#menu-edit-undo", function () {
+        CM6.undo(editor.editor);
+      });
+      menu.click("#menu-edit-redo", function () {
+        CM6.redo(editor.editor);
+      });
+      menu.click("#menu-edit-find", function () {
+        CM6.openSearchPanel(editor.editor);
+        setTimeout(function () {
+          var searchInput = document.querySelector(".cm-search input[main-field]");
+          if (searchInput) searchInput.focus();
+        }, 0);
+      });
+      menu.click("#menu-edit-find-replace", function () {
+        CM6.openSearchPanel(editor.editor);
+        setTimeout(function () {
+          var searchInput = document.querySelector(".cm-search input[main-field]");
+          if (searchInput) searchInput.focus();
+        }, 0);
+      });
+      menu.click("#menu-edit-find-files", function () {
+        app.findFiles();
+      });
+      menu.click("#menu-edit-toggle-comment", function () {
+        CM6.toggleComment(editor.editor);
+      });
+      menu.click("#menu-edit-preferences", function () {
+        preferences.show();
+      });
+      menu.click("#menu-edit-format", function () {
+        editor.exec("format");
+      });
+      menu.click("#menu-navigate-definition", function () {
+        editor.exec("gotoDefinition");
+      });
+      menu.click("#menu-navigate-references", function () {
+        editor.exec("findReferences");
+      });
+      menu.click("#menu-navigate-info", function () {
+        editor.exec("showFunctionDoc");
+      });
+      menu.click("#menu-navigate-symbol", function () {
+        editor.exec("gotoSymbol");
+      });
+      menu.click("#menu-navigate-buffer", function () {
+        editor.selectTab();
+      });
+      menu.click("#menu-navigate-commands", function () {
+        app.getMenu().commandPalette();
+      });
+      menu.click("#menu-navigate-line", function () {
+        editor.gotoLine();
+      });
+      menu.click("#menu-navigate-history", function () {
+        editor.historyBack();
+      });
+      menu.click("#menu-navigate-diagnostics", function () {
+        editor.toggleDiagnostics();
+      });
+      menu.click("#menu-view-toggle-collections", function () {
+        app.toggleCollectionsPanel();
+      });
+      menu.click("#menu-view-toggle-results", function () {
+        app.toggleResultsPanel();
+      });
+      menu.click("#menu-view-toggle-monitor", function () {
+        app.toggleMonitor();
+      });
+      menu.click("#menu-view-reset", function () {
+        layout.reset();
+      });
+      menu.click("#menu-view-reset-workspace", function () {
+        if (
+          confirm(
+            "This will clear all saved tabs, preferences, and layout state, then reload. Continue?"
+          )
+        ) {
+          app._skipSaveState = true;
+          Object.keys(localStorage)
+            .filter(function (k) {
+              return k.startsWith("eXide.");
+            })
+            .forEach(function (k) {
+              localStorage.removeItem(k);
+            });
+          location.reload();
+        }
+      });
+      menu.click("#menu-view-toggle-dark-mode", function () {
+        document.getElementById("toggle-dark-mode").click();
+      });
+      menu.click("#menu-view-toggle-fullscreen", function () {
+        util.requestFullScreen(document.getElementById("fullscreen"));
+      });
+      menu.click("#menu-deploy-run", app.runAppOrQuery);
+
+      menu.click("#menu-help-keyboard", function (ev) {
+        dialogs["keyboard-help"].open();
+      });
+      menu.click("#menu-help-about", function (ev) {
+        dialogs["about-dialog"].open();
+      });
+      menu.click("#menu-help-documentation", function (ev) {
+        window.open("https://github.com/eXist-db/eXide#readme");
+      });
+      // type popover in status bar
+      (function () {
+        var typeBtn = document.getElementById("status-type");
+        var popover = document.getElementById("type-popover");
+        var arrow = typeBtn ? typeBtn.querySelector(".status-segment-arrow") : null;
+        if (typeBtn && popover) {
+          typeBtn.addEventListener("click", function (ev) {
+            ev.stopPropagation();
+            var isOpen = popover.classList.toggle("open");
+            if (arrow) arrow.innerHTML = isOpen ? "&#x25BC;" : "&#x25B2;";
+          });
+          popover.addEventListener("click", function (ev) {
+            var item = ev.target.closest(".type-popover-item");
+            if (!item) return;
+            editor.setMode(item.dataset.value);
+            var doc = editor.getActiveDocument();
+            if (doc) app.updateStatus(doc);
+            popover.classList.remove("open");
+            if (arrow) arrow.innerHTML = "&#x25B2;";
+          });
+          document.addEventListener("click", function () {
+            popover.classList.remove("open");
+            if (arrow) arrow.innerHTML = "&#x25B2;";
+          });
+        }
+      })();
+      // register listener to update status bar segments
+      editor.addEventListener("activate", null, function (doc) {
+        app.updateStatus(doc);
+        projects.findProject(doc.getBasePath(), function (app) {
+          if (app) {
+            var appEl = document.getElementById("toolbar-current-app");
+            appEl.textContent = app.abbrev;
+            var appLink = document.getElementById("toolbar-current-app-link");
+            appLink.classList.remove("unknown");
+            var appUrl = app.url
+              ? eXide.configuration.context + app.url.replace(/\/{2,}/, "/") + "/"
+              : "#";
+            appLink.href = appUrl;
+            var appIcon = document.getElementById("toolbar-current-app-icon");
+            appIcon.src = eXide.configuration.context + "/apps/" + app.abbrev + "/icon.png";
+            appIcon.style.display = "";
+            appIcon.onerror = function () {
+              this.style.display = "none";
+              this.onerror = null;
             };
-            return {
-                 branch: unavailable,
-                 command: unavailable
-             }
-        }(),
-
-        findFiles: function() {
-            var doc = editor.getActiveDocument();
-            projects.findProject(doc.getBasePath(), function(app) {
-                eXide.find.Files.open(doc, app, function(searchParams) {
-                    editor.updateStatus("");
-				    editor.clearErrors();
-				    startOffset = 1;
-				    currentOffset = 1;
-
-                    var iframe = document.getElementById("results-iframe");
-                    iframe.style.display = "";
-				    eXide.app.showResultsPanel();
-
-                    iframe.contentWindow.document.open('text/html', 'replace');
-                    iframe.contentWindow.document.write("<html><body><p>Searching ...</p></body></html>");
-                    iframe.contentWindow.document.close();
-
-                    // Parse form params into JSON body for POST /api/search
-                    var formParams = new URLSearchParams(searchParams);
-                    var target = formParams.get("target");
-                    var collection = target === "all" ? "/db" :
-                        target === "collection" ? formParams.get("collection") :
-                        (target || "/db");
-                    var body = {
-                        query: formParams.get("search"),
-                        collection: collection,
-                        type: formParams.get("type") || "all",
-                        regex: formParams.has("regex"),
-                        caseSensitive: formParams.has("case")
-                    };
-
-                    fetch("api/search", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(body)
-                    })
-                    .then(function(response) { return response.json(); })
-                    .then(function(data) {
-                        if (data.error) {
-                            iframe.contentWindow.document.open('text/html', 'replace');
-                            iframe.contentWindow.document.write("<html><body><p>" + data.error + "</p></body></html>");
-                            iframe.contentWindow.document.close();
-                            return;
-                        }
-                        var hits = data.hits || [];
-                        var html = '<html><head><link rel="stylesheet" type="text/css" href="resources/css/search.css"/></head><body>';
-                        html += '<div><h3>Search Results for ' + data.query + ' in ' + data.collection + '</h3><ul>';
-                        if (hits.length === 0) {
-                            html += '<li>No matches found.</li>';
-                        }
-                        for (var i = 0; i < hits.length; i++) {
-                            var hit = hits[i];
-                            html += '<li class="sourceinfo"><a class="resource" href="#" data-src="' +
-                                hit.resource + '" data-line="' + hit.line + '">' +
-                                hit.name + '</a><span class="line">line ' + hit.line + '</span></li>';
-                            html += '<li class="code">' + hit.text.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</li>';
-                        }
-                        html += '</ul></div></body></html>';
-                        iframe.contentWindow.document.open('text/html', 'replace');
-                        iframe.contentWindow.document.write(html);
-                        iframe.contentWindow.document.close();
-                        // Bind click handlers
-                        var links = iframe.contentDocument.querySelectorAll(".resource");
-                        for (var j = 0; j < links.length; j++) {
-                            links[j].addEventListener("click", function(ev) {
-                                ev.preventDefault();
-                                eXide.app.findDocument(this.dataset.src, parseInt(this.dataset.line));
-                            });
-                        }
-                    });
-                });
-            });
-        },
-
-        liveReload: function() {
-            var doc = editor.getActiveDocument();
-            projects.findProject(doc.getBasePath(), function(project) {
-                if (project == null) {
-                    return;
-                }
-                console.log("live reload: %s %s", project.liveReload, project.abbrev);
-                if (project.liveReload) {
-                    var url = project.url.replace(/\/{2,}/, "/");
-                    var link = eXide.configuration.context + url + "/";
-                    project.win = window.open(link, project.abbrev);
-                    if (project.win && !project.win.closed) {
-                        project.win.location.reload();
-                    } else {
-                        console.log("app window not found: %s", project.abbrev);
-                    }
-                }
-            });
-        },
-
-        toggleLiveReload: function() {
-            var doc = editor.getActiveDocument();
-            projects.findProject(doc.getBasePath(), function(project) {
-                if (!project) {
-                    return;
-                }
-                project.liveReload = !project.liveReload;
-                document.querySelector("#menu-deploy-live span").setAttribute("class", project.liveReload ? "fa fa-check-square-o" : "fa fa-square-o");
-                if (project.liveReload && (!project.win || project.win.closed)) {
-                    app.openApp(true);
-                }
-            });
-        },
-
-		initGUI: function(menu) {
-            resultPanel = "south";
-            layout = new app.Layout(editor);
-            layout.hide("east");
-
-			dialogs["open-dialog"] = eXide.util.DialogManager.create(
-			    document.getElementById("open-dialog"), {
-                    appendTo: "#layout-container",
-    				title: "Open file",
-    				modal: false,
-    		        height: 480,
-    		        width: 640
-			    }
-			);
-			var openDialogEl = document.getElementById("open-dialog");
-			dialogs["open-dialog"].dialog.addEventListener("close", function() {});
-			var origOpenDialogOpen = dialogs["open-dialog"].open;
-			dialogs["open-dialog"].open = function() {
-			    origOpenDialogOpen.call(dialogs["open-dialog"]);
-			    dbBrowser.init();
-			};
-
-			dialogs["login-dialog"] = eXide.util.DialogManager.create(
-			    document.getElementById("login-dialog"), {
-                    appendTo: "#layout-container",
-    				title: "Login",
-    				modal: true,
-    				width: 360
-			    }
-			);
-			dialogs["login-dialog"]._onClose = null;
-			dialogs["login-dialog"].dialog.addEventListener("close", function() {
-			    if (dialogs["login-dialog"]._onClose) {
-			        dialogs["login-dialog"]._onClose();
-			        dialogs["login-dialog"]._onClose = null;
-			    }
-			});
-			dialogs["login-dialog"].setButtons({
-			    "Login": function() {
-                    var user = document.querySelector("#login-form input[name=\"user\"]").value;
-                    var password = document.querySelector("#login-form input[name=\"password\"]").value;
-                    var formData = new URLSearchParams();
-                    formData.append("user", user);
-                    formData.append("password", password);
-                    var durationEl = document.querySelector("#login-form input[name=\"duration\"]");
-                    if (durationEl && durationEl.checked) {
-                        formData.append("duration", "P14D");
-                    }
-					fetch("api/auth/session", {
-					    method: "POST",
-					    headers: {
-					        "Content-Type": "application/x-www-form-urlencoded"
-					    },
-					    body: formData.toString()
-					})
-					.then(function(response) {
-					    return response.json();
-					})
-					.then(function(data) {
-					    if (!data.user) {
-					        document.getElementById("login-error").textContent = "Login failed.";
-					        var firstInput = document.querySelector("#login-dialog input:first-of-type");
-					        if (firstInput) firstInput.focus();
-					    } else {
-						    app.login = data;
-						    console.log("Logged in as %o. Is dba: %s", data, app.login.isAdmin);
-						    dialogs["login-dialog"].close();
-						    app.updateAuthStatus(app.login.user);
-						    editor.focus();
-					    }
-					})
-					.catch(function(err) {
-					    document.getElementById("login-error").textContent = "Login failed. " + (err.message || "");
-					    var firstInput = document.querySelector("#login-dialog input:first-of-type");
-					    if (firstInput) firstInput.focus();
-					});
-			    },
-			    "Cancel": function() {
-			        dialogs["login-dialog"].close();
-			        editor.focus();
-			    }
-			});
-			var origLoginOpen = dialogs["login-dialog"].open;
-			dialogs["login-dialog"].open = function() {
-			    origLoginOpen.call(dialogs["login-dialog"]);
-			    var loginDialogEl = document.getElementById("login-dialog");
-			    var inputs = loginDialogEl.querySelectorAll("input");
-			    inputs.forEach(function(input) { input.value = ""; });
-			    var firstInput = loginDialogEl.querySelector("input:first-of-type");
-			    if (firstInput) firstInput.focus();
-			    document.getElementById("login-error").textContent = "";
-			    inputs.forEach(function(input) {
-			        input.addEventListener("keyup", function(e) {
-			            if (e.keyCode == 13) {
-			                var loginBtn = dialogs["login-dialog"].dialog.querySelector(".eXide-dialog-buttons button:first-of-type");
-			                if (loginBtn) loginBtn.click();
-			            }
-			        });
-			    });
-			};
-
-			dialogs["keyboard-help"] = eXide.util.DialogManager.create(
-			    document.getElementById("keyboard-help"), {
-                    appendTo: "#layout-container",
-    				title: "Keyboard Shortcuts",
-    				modal: false,
-    				height: 520,
-                    width: 460,
-    				buttons: {
-    					"Close": function () { dialogs["keyboard-help"].close(); }
-    				}
-			    }
-			);
-			var origKbHelpOpen = dialogs["keyboard-help"].open;
-			dialogs["keyboard-help"].open = function() {
-			    origKbHelpOpen.call(dialogs["keyboard-help"]);
-			    eXide.edit.commands.help(document.getElementById("keyboard-help"), editor);
-			};
-
-            dialogs["about-dialog"] = eXide.util.DialogManager.create(
-                document.getElementById("about-dialog"), {
-                    appendTo: "#layout-container",
-                    title: "About",
-                    modal: false,
-                    height: 300,
-                    width: 450,
-                    buttons: {
-    				    "Close": function () { dialogs["about-dialog"].close(); }
-				    }
-                }
-            );
-            dialogs["dialog-templates"] = eXide.util.DialogManager.create(
-                document.getElementById("dialog-templates"), {
-                    appendTo: "#layout-container",
-    			    title: "New Document",
-    				modal: false,
-    		        height: 280,
-    		        width: 550,
-                    buttons: {
-				        "Cancel": function () { dialogs["dialog-templates"].close(); editor.focus(); },
-                        "Create": function() {
-                            var templEl = document.getElementById("dialog-templates");
-                            var mode = templEl.querySelector(".type-select").value;
-                            var template = templEl.querySelector(".templates select").value;
-                            console.log("creating new doc with mode: %s and template: %s", mode, template);
-                            editor.newDocumentFromTemplate(mode, template);
-                            dialogs["dialog-templates"].close();
-                            editor.focus();
-                        }
-                    }
-                }
-            );
-            var origTemplOpen = dialogs["dialog-templates"].open;
-            dialogs["dialog-templates"].open = function() {
-                origTemplOpen.call(dialogs["dialog-templates"]);
-                fetch("api/templates")
-                .then(function(response) { return response.json(); })
-                .then(function(data) {
-                    templates = data;
-                    var templatesDiv = document.querySelector("#dialog-templates .templates");
-                    if (templatesDiv) templatesDiv.style.display = "none";
-                    var typeSelect = document.querySelector("#dialog-templates .type-select");
-                    if (typeSelect) {
-                        typeSelect.value = "xquery";
-                        typeSelect.dispatchEvent(new Event("change"));
-                        typeSelect.focus();
-                    }
-                });
-            };
-            document.querySelector("#dialog-templates .type-select").addEventListener("change", function() {
-                var templ = document.querySelector("#dialog-templates .templates");
-                var templSel = templ.querySelector("select");
-                var type = this.value;
-                templSel.innerHTML = "";
-                var mode = templates[type];
-                if (mode) {
-                    var options = "<option value=''>None</option>";
-                    for (var i = 0; i < mode.length; i++) {
-                        options += "<option value='" + mode[i].name + "'>" + mode[i].description + "</option>";
-                    }
-                    templSel.innerHTML = options;
-                    templ.style.display = "";
-                } else {
-                    templ.style.display = "none";
-                }
-            });
-
-			// initialize buttons and menu events
-            var btnOpen = document.getElementById("open");
-			btnOpen.addEventListener("click", app.openDocument);
-            menu.click("#menu-file-open", app.openDocument);
-
-            var btnClose = document.getElementById("close");
-			btnClose.addEventListener("click", app.closeDocument);
-			menu.click("#menu-file-close", app.closeDocument);
-
-			menu.click("#menu-file-close-all", app.closeAll);
-
-            var btnNew = document.getElementById("new");
-			btnNew.addEventListener("click", function() {
-                app.newDocumentFromTemplate();
-			});
-
-            var btnNewXquery = document.getElementById("new-xquery");
-			btnNewXquery.addEventListener("click", function() {
-                app.newDocument(null, "xquery");
-			});
-			menu.click("#menu-file-new", app.newDocumentFromTemplate);
-    		menu.click("#menu-file-new-xquery", function() {
-                app.newDocument(null, "xquery");
-    		});
-
-            var btnRun = document.getElementById("run");
-            btnRun.disabled = true;
-			btnRun.addEventListener("click", function(ev) { app.runQuery() });
-
-            var btnCancel = document.getElementById("cancel-query");
-            if (btnCancel) {
-                btnCancel.addEventListener("click", function() { app.cancelQuery(); });
+            document.getElementById("menu-deploy-active").textContent = app.abbrev;
+            document
+              .querySelector("#menu-deploy-live span")
+              .setAttribute("class", app.liveReload ? "fa fa-check-square-o" : "fa fa-square-o");
+            // update show/hide git stuff
+            if (app.git == "true" || app.git == true) {
+              document.querySelectorAll(".current-branch").forEach(function (el) {
+                el.style.display = "";
+              });
+              document.getElementById("menu-git").style.display = "";
+              // update git-status
+              eXide.app.git.branch(app);
+            } else {
+              document.querySelectorAll(".current-branch").forEach(function (el) {
+                el.style.display = "none";
+              });
+              document.getElementById("menu-git").style.display = "none";
             }
+          } else {
+            var appEl2 = document.getElementById("toolbar-current-app");
+            appEl2.textContent = "unknown";
+            var appLink2 = document.getElementById("toolbar-current-app-link");
+            appLink2.classList.add("unknown");
+            appLink2.removeAttribute("href");
+            var appIcon2 = document.getElementById("toolbar-current-app-icon");
+            appIcon2.style.display = "none";
+            document.getElementById("menu-deploy-active").textContent = "unknown";
+            document.querySelectorAll(".current-branch").forEach(function (el) {
+              el.style.display = "none";
+            });
+            document.getElementById("menu-git").style.display = "none";
+          }
+        });
+      });
 
-            var btnLaunch = document.getElementById("launch");
-			btnLaunch.addEventListener("click", function(ev) { app.runAppOrQuery() });
+      document.getElementById("user").addEventListener("click", function (ev) {
+        ev.preventDefault();
+        if (app.login) {
+          // logout
+          fetch("api/auth/session?logout=true", { method: "DELETE" });
+          app.updateAuthStatus(null);
+          app.login = null;
+        } else {
+          dialogs["login-dialog"].open();
+        }
+      });
+      if (!util.supportsFullScreen()) {
+        document.getElementById("toggle-fullscreen").style.display = "none";
+      }
+      document.getElementById("toggle-fullscreen").addEventListener("click", function (ev) {
+        ev.preventDefault();
+        util.requestFullScreen(document.getElementById("fullscreen"));
+      });
+      document.getElementById("toggle-dark-mode").addEventListener("click", function (ev) {
+        ev.preventDefault();
+        // Toggle between light/dark for the current session only (does not save to preferences)
+        var isDark = document.body.classList.contains("dark");
+        var newTheme = isDark ? "light" : "dark";
+        app.setTheme({ isDark: newTheme === "dark" });
+        app.updateDarkModeIcon(newTheme);
+      });
+      document.querySelectorAll('.navbar .toggle-btn[id$="-btn"]').forEach(function (btn) {
+        btn.addEventListener("click", function (e) {
+          e.preventDefault();
+          var cb = btn.querySelector('input[type="checkbox"]');
+          var checked = !cb.checked;
+          cb.checked = checked;
+          btn.classList.toggle("active", checked);
+          // Dispatch change event so listeners (e.g., cursor re-fetch) fire
+          cb.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+      });
 
-            var statusCursor = document.getElementById("status-cursor");
-            if (statusCursor) {
-                statusCursor.style.cursor = "pointer";
-                statusCursor.title = "Go to Line";
-                statusCursor.addEventListener("click", function() {
-                    editor.gotoLine();
-                });
+      document.querySelectorAll(".results-container #copy-all-clipboard").forEach(function (btnEl) {
+        btnEl.addEventListener("click", function (e) {
+          e.preventDefault();
+          var icon = btnEl.querySelector(".fa");
+          var texts = [];
+          document
+            .querySelectorAll("#results-body > div > div > div > div.item")
+            .forEach(function (item) {
+              texts.push(item.innerText);
+            });
+          var res = texts.join("\n");
+          navigator.clipboard.writeText(res).then(
+            function () {
+              icon.classList.remove("fa-clipboard");
+              icon.classList.add("fa-check");
+              btnEl.classList.add("copied");
+              eXide.util.message("Copied results to clipboard");
+              setTimeout(function () {
+                icon.classList.remove("fa-check");
+                icon.classList.add("fa-clipboard");
+                btnEl.classList.remove("copied");
+              }, 1200);
+            },
+            function (err) {
+              console.error("Could not copy text: ", err);
             }
+          );
+        });
+      });
+      document.querySelectorAll(".results-container .next").forEach(function (el) {
+        el.addEventListener("click", app.browseNext);
+      });
+      document.querySelectorAll(".results-container .previous").forEach(function (el) {
+        el.addEventListener("click", app.browsePrevious);
+      });
+      document.querySelectorAll(".results-container .first-page").forEach(function (el) {
+        el.addEventListener("click", app.browseFirst);
+      });
+      document.querySelectorAll(".results-container .last-page").forEach(function (el) {
+        el.addEventListener("click", app.browseLast);
+      });
 
-            document.getElementById("status-copy-url").addEventListener("click", function() {
-                var pathEl = document.querySelector("#status .path");
-                var path = pathEl ? pathEl.textContent : null;
-                if (path) {
-                    navigator.clipboard.writeText(path).then(function() {
-                        app.showMessage("Path copied to clipboard");
-                    });
-                }
-            });
+      function scrollToResult(idx) {
+        var items = document.querySelectorAll(
+          ".results-container .results > .even, .results-container .results > .uneven"
+        );
+        if (items.length === 0) return;
+        idx = Math.max(0, Math.min(idx, items.length - 1));
+        activeResultIdx = idx;
+        items.forEach(function (el) {
+          el.classList.remove("result-active");
+        });
+        var target = items[idx];
+        target.classList.add("result-active");
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      document.querySelectorAll(".results-container .result-prev").forEach(function (el) {
+        el.addEventListener("click", function (e) {
+          e.preventDefault();
+          scrollToResult(activeResultIdx <= 0 ? 0 : activeResultIdx - 1);
+        });
+      });
+      document.querySelectorAll(".results-container .result-next").forEach(function (el) {
+        el.addEventListener("click", function (e) {
+          e.preventDefault();
+          scrollToResult(activeResultIdx < 0 ? 1 : activeResultIdx + 1);
+        });
+      });
+      document.getElementById("number-of-results").addEventListener("change", function (ev) {
+        numberOfResults = +document.getElementById("number-of-results").value;
+        if (app._cursorId) {
+          startOffset = 1;
+          currentOffset = 1;
+          endOffset = Math.min(numberOfResults, hitCount);
+          app.fetchCursorPage(startOffset, endOffset);
+        }
+      });
+      document.getElementById("serialization-mode").addEventListener("change", function (ev) {
+        if (app._cursorId) {
+          // Re-fetch current page with new serialization settings
+          app.fetchCursorPage(startOffset, endOffset);
+        } else if (lastQuery) {
+          app.runQuery(lastQuery);
+        }
+      });
+      // Re-fetch on indent/highlight toggle changes too
+      document.getElementById("indent-results").addEventListener("change", function () {
+        if (app._cursorId) app.fetchCursorPage(startOffset, endOffset);
+      });
+      document.getElementById("auto-expand-matches").addEventListener("change", function () {
+        if (app._cursorId) app.fetchCursorPage(startOffset, endOffset);
+      });
+      document.getElementById("error-status").addEventListener("mouseover", function (ev) {
+        var error = this;
+        var extBar = document.getElementById("ext-status-bar");
+        if (extBar) {
+          extBar.innerHTML = error.innerHTML;
+          extBar.style.display = "block";
+        }
+      });
+      var errorStatus = document.getElementById("error-status");
+      var extStatusBar = document.getElementById("ext-status-bar");
+      if (extStatusBar) {
+        extStatusBar.addEventListener("mouseout", function (ev) {
+          extStatusBar.style.display = "none";
+        });
+      }
+      if (errorStatus) {
+        errorStatus.addEventListener("mouseout", function (ev) {
+          if (extStatusBar) extStatusBar.style.display = "none";
+        });
+      }
+      window.addEventListener("blur", function () {
+        hasFocus = false;
+      });
+      window.addEventListener("focus", function () {
+        var checkLogin = !hasFocus;
+        hasFocus = true;
+        if (checkLogin) {
+          app.getLogin();
+        }
+      });
 
-            var btnToggleSplitPane = document.getElementById("toggle-split-pane");
-            if (btnToggleSplitPane) {
-                btnToggleSplitPane.addEventListener("click", function() {
-                    var prefs = preferences.preferences;
-                    prefs.splitPane = !prefs.splitPane;
-                    var pw = document.querySelector('.panel-west');
-                    if (pw) {
-                        pw.classList.toggle('split-pane', prefs.splitPane);
-                    }
-                    btnToggleSplitPane.setAttribute('aria-pressed', prefs.splitPane ? 'true' : 'false');
-                    btnToggleSplitPane.textContent = prefs.splitPane ? '\u229E' : '\u229F';
-                    if (prefs.splitPane) {
-                        editor.outline.toggle(true);
-                        editor.directory.toggle(true);
-                    } else {
-                        // Restore tabbed mode: activate whichever tab is marked active
-                        var tabs = document.querySelectorAll('#tabs-outline a.tab');
-                        var activeIndex = 0;
-                        tabs.forEach(function(t, i) { if (t.classList.contains('active')) activeIndex = i; });
-                        editor.directory.toggle(activeIndex === 0);
-                        editor.outline.toggle(activeIndex === 1);
-                    }
-                    preferences.save();
-                });
-            }
+      dialogs["dialog-startup"] = eXide.util.DialogManager.create(
+        document.getElementById("dialog-startup"),
+        {
+          appendTo: "#layout-container",
+          modal: false,
+          title: "Quick Start",
+          width: 400,
+          height: 300,
+          buttons: {
+            OK: function () {
+              dialogs["dialog-startup"].close();
+            },
+          },
+        }
+      );
+      if (!util.supportsHtml5Storage) return;
+      var showHints = localStorage.getItem("eXide.firstTime");
+      if (!showHints || showHints == 1) {
+        dialogs["dialog-startup"].open();
+      }
+    },
+  };
 
-            var btnToggleOutline = document.getElementById("toggle-outline");
-            if (btnToggleOutline) {
-                btnToggleOutline.addEventListener("click", function() {
-                    layout.toggle("west");
-                    app.$savePanelPrefs();
-                });
-            }
-            var btnToggleResults = document.getElementById("toggle-results");
-            if (btnToggleResults) {
-                btnToggleResults.addEventListener("click", function() {
-                    layout.toggle(resultPanel);
-                    app.$savePanelPrefs();
-                });
-            }
-
-            var btnToggleMonitor = document.getElementById("toggle-monitor");
-            if (btnToggleMonitor) {
-                btnToggleMonitor.addEventListener("click", function() {
-                    app.toggleMonitor();
-                });
-            }
-
-            var btnMonitorClose = document.getElementById("monitor-close");
-            if (btnMonitorClose) {
-                btnMonitorClose.addEventListener("click", function() {
-                    app.toggleMonitor();
-                });
-            }
-
-            // delegate kill buttons in monitor
-            var monRunning = document.getElementById("mon-running-body");
-            if (monRunning) {
-                monRunning.addEventListener("click", function(ev) {
-                    var btn = ev.target.closest(".mon-kill");
-                    if (btn && monitor) {
-                        monitor.killQuery(btn.dataset.id);
-                    }
-                });
-            }
-
-            var btnDebug = document.getElementById("debug");
-            if (btnDebug) btnDebug.addEventListener("click", app.startDebug);
-
-            var btnStepOver = document.querySelector("#debug-actions #step-over");
-            if (btnStepOver) btnStepOver.addEventListener("click", app.stepOver);
-
-            var btnStepInto = document.querySelector("#debug-actions #step-into");
-            if (btnStepInto) btnStepInto.addEventListener("click", app.stepInto);
-
-            var btnStepOut = document.querySelector("#debug-actions #step-out");
-            if (btnStepOut) btnStepOut.addEventListener("click", app.startDebug);
-
-            var btnValidate = document.getElementById("validate");
-			if (btnValidate) btnValidate.addEventListener("click", app.checkQuery);
-
-            var btnSave = document.getElementById("save");
-			btnSave.addEventListener("click", app.saveDocument);
-			menu.click("#menu-file-save", app.saveDocument);
-            menu.click("#menu-file-save-as", app.saveDocumentAs);
-
-            menu.click("#menu-file-reload", app.reloadDocument);
-
-			menu.click("#menu-file-download", app.download);
-			menu.click("#menu-file-manager", app.manage);
-			// menu-only events
-			menu.click("#menu-deploy-new", app.newDeployment);
-			menu.click("#menu-deploy-edit", app.deploymentSettings);
-			menu.click("#menu-deploy-live", app.toggleLiveReload);
-			menu.click("#menu-deploy-sync", app.synchronize);
-            menu.click("#menu-deploy-download", app.downloadApp);
-
-            menu.click("#menu-git-checkout", app.gitCheckout);
-            menu.click("#menu-git-commit", app.gitCommit);
-
-			menu.click("#menu-edit-undo", function () {
-				CM6.undo(editor.editor);
-			});
-			menu.click("#menu-edit-redo", function () {
-				CM6.redo(editor.editor);
-			});
-            menu.click("#menu-edit-find", function() {
-                CM6.openSearchPanel(editor.editor);
-                setTimeout(function() {
-                    var searchInput = document.querySelector(".cm-search input[main-field]");
-                    if (searchInput) searchInput.focus();
-                }, 0);
-            });
-            menu.click("#menu-edit-find-replace", function() {
-                CM6.openSearchPanel(editor.editor);
-                setTimeout(function() {
-                    var searchInput = document.querySelector(".cm-search input[main-field]");
-                    if (searchInput) searchInput.focus();
-                }, 0);
-            });
-            menu.click("#menu-edit-find-files", function() {
-                app.findFiles();
-            });
-            menu.click("#menu-edit-toggle-comment", function () {
-                CM6.toggleComment(editor.editor);
-            });
-			menu.click("#menu-edit-preferences", function() {
-                preferences.show();
-			});
-            menu.click("#menu-edit-format", function() {
-                editor.exec("format");
-            });
-            menu.click("#menu-navigate-definition", function () {
-                editor.exec("gotoDefinition");
-            });
-            menu.click("#menu-navigate-references", function () {
-                editor.exec("findReferences");
-            });
-            menu.click("#menu-navigate-info", function() {
-                editor.exec("showFunctionDoc");
-            });
-            menu.click("#menu-navigate-symbol", function() {
-                editor.exec("gotoSymbol");
-            });
-            menu.click("#menu-navigate-buffer", function() {
-                editor.selectTab();
-            });
-            menu.click("#menu-navigate-commands", function() {
-                app.getMenu().commandPalette();
-            });
-            menu.click("#menu-navigate-line", function() {
-                editor.gotoLine();
-            });
-            menu.click("#menu-navigate-history", function() {
-                editor.historyBack();
-            });
-            menu.click("#menu-navigate-diagnostics", function() {
-                editor.toggleDiagnostics();
-            });
-            menu.click("#menu-view-toggle-collections", function() {
-                app.toggleCollectionsPanel();
-            });
-            menu.click("#menu-view-toggle-results", function() {
-                app.toggleResultsPanel();
-            });
-            menu.click("#menu-view-toggle-monitor", function() {
-                app.toggleMonitor();
-            });
-            menu.click("#menu-view-reset", function() {
-                layout.reset();
-            });
-            menu.click("#menu-view-reset-workspace", function() {
-                if (confirm("This will clear all saved tabs, preferences, and layout state, then reload. Continue?")) {
-                    app._skipSaveState = true;
-                    Object.keys(localStorage).filter(function(k) { return k.startsWith("eXide."); }).forEach(function(k) { localStorage.removeItem(k); });
-                    location.reload();
-                }
-            });
-            menu.click("#menu-view-toggle-dark-mode", function() {
-                document.getElementById("toggle-dark-mode").click();
-            });
-            menu.click("#menu-view-toggle-fullscreen", function() {
-                util.requestFullScreen(document.getElementById("fullscreen"));
-            });
-			menu.click("#menu-deploy-run", app.runAppOrQuery);
-
-            menu.click("#menu-help-keyboard", function (ev) {
-				dialogs["keyboard-help"].open();
-			});
-            menu.click("#menu-help-about", function (ev) {
-				dialogs["about-dialog"].open();
-			});
-            menu.click("#menu-help-documentation", function(ev) {
-                window.open("https://github.com/eXist-db/eXide#readme");
-            });
-			// type popover in status bar
-			(function() {
-				var typeBtn = document.getElementById("status-type");
-				var popover = document.getElementById("type-popover");
-				var arrow = typeBtn ? typeBtn.querySelector(".status-segment-arrow") : null;
-				if (typeBtn && popover) {
-					typeBtn.addEventListener("click", function(ev) {
-						ev.stopPropagation();
-						var isOpen = popover.classList.toggle("open");
-						if (arrow) arrow.innerHTML = isOpen ? "&#x25BC;" : "&#x25B2;";
-					});
-					popover.addEventListener("click", function(ev) {
-						var item = ev.target.closest(".type-popover-item");
-						if (!item) return;
-						editor.setMode(item.dataset.value);
-						var doc = editor.getActiveDocument();
-						if (doc) app.updateStatus(doc);
-						popover.classList.remove("open");
-						if (arrow) arrow.innerHTML = "&#x25B2;";
-					});
-					document.addEventListener("click", function() {
-						popover.classList.remove("open");
-						if (arrow) arrow.innerHTML = "&#x25B2;";
-					});
-				}
-			})();
-			// register listener to update status bar segments
-			editor.addEventListener("activate", null, function (doc) {
-                app.updateStatus(doc);
-                projects.findProject(doc.getBasePath(), function(app) {
-                    if (app) {
-                        var appEl = document.getElementById("toolbar-current-app");
-                        appEl.textContent = app.abbrev;
-                        var appLink = document.getElementById("toolbar-current-app-link");
-                        appLink.classList.remove("unknown");
-                        var appUrl = app.url ? (eXide.configuration.context + app.url.replace(/\/{2,}/, "/") + "/") : "#";
-                        appLink.href = appUrl;
-                        var appIcon = document.getElementById("toolbar-current-app-icon");
-                        appIcon.src = eXide.configuration.context + "/apps/" + app.abbrev + "/icon.png";
-                        appIcon.style.display = "";
-                        appIcon.onerror = function() {
-                            this.style.display = "none";
-                            this.onerror = null;
-                        };
-                        document.getElementById("menu-deploy-active").textContent = app.abbrev;
-                        document.querySelector("#menu-deploy-live span").setAttribute("class", app.liveReload ? "fa fa-check-square-o" : "fa fa-square-o");
-                        // update show/hide git stuff
-                        if(app.git == "true" || app.git == true) {
-                            document.querySelectorAll(".current-branch").forEach(function(el) { el.style.display = ""; });
-                            document.getElementById("menu-git").style.display = "";
-                            // update git-status
-                            eXide.app.git.branch(app);
-                        } else {
-                            document.querySelectorAll(".current-branch").forEach(function(el) { el.style.display = "none"; });
-                            document.getElementById("menu-git").style.display = "none";
-                        }
-
-                    } else {
-                        var appEl2 = document.getElementById("toolbar-current-app");
-                        appEl2.textContent = "unknown";
-                        var appLink2 = document.getElementById("toolbar-current-app-link");
-                        appLink2.classList.add("unknown");
-                        appLink2.removeAttribute("href");
-                        var appIcon2 = document.getElementById("toolbar-current-app-icon");
-                        appIcon2.style.display = "none";
-                        document.getElementById("menu-deploy-active").textContent = "unknown";
-                        document.querySelectorAll(".current-branch").forEach(function(el) { el.style.display = "none"; });
-                        document.getElementById("menu-git").style.display = "none";
-                    }
-                });
-			});
-
-
-			document.getElementById("user").addEventListener("click", function (ev) {
-				ev.preventDefault();
-				if (app.login) {
-					// logout
-					fetch("api/auth/session?logout=true", { method: "DELETE" });
-					app.updateAuthStatus(null);
-					app.login = null;
-				} else {
-					dialogs["login-dialog"].open();
-				}
-			});
-            if (!util.supportsFullScreen()) {
-                document.getElementById("toggle-fullscreen").style.display = "none";
-            }
-            document.getElementById("toggle-fullscreen").addEventListener("click", function(ev) {
-                ev.preventDefault();
-                util.requestFullScreen(document.getElementById("fullscreen"));
-            });
-            document.getElementById("toggle-dark-mode").addEventListener("click", function(ev) {
-                ev.preventDefault();
-                // Toggle between light/dark for the current session only (does not save to preferences)
-                var isDark = document.body.classList.contains("dark");
-                var newTheme = isDark ? "light" : "dark";
-                app.setTheme({ isDark: newTheme === "dark" });
-                app.updateDarkModeIcon(newTheme);
-            });
-            document.querySelectorAll('.navbar .toggle-btn[id$="-btn"]').forEach(function(btn) {
-                btn.addEventListener("click", function(e) {
-                    e.preventDefault();
-                    var cb = btn.querySelector('input[type="checkbox"]');
-                    var checked = !cb.checked;
-                    cb.checked = checked;
-                    btn.classList.toggle('active', checked);
-                    // Dispatch change event so listeners (e.g., cursor re-fetch) fire
-                    cb.dispatchEvent(new Event("change", { bubbles: true }));
-                });
-            });
-
-			document.querySelectorAll('.results-container #copy-all-clipboard').forEach(function(btnEl) {
-			    btnEl.addEventListener("click", function(e) {
-                    e.preventDefault();
-                    var icon = btnEl.querySelector('.fa');
-                    var texts = [];
-                    document.querySelectorAll("#results-body > div > div > div > div.item").forEach(function (item) { texts.push(item.innerText); });
-                    var res = texts.join('\n');
-                    navigator.clipboard.writeText(res).then(function() {
-                        icon.classList.remove('fa-clipboard');
-                        icon.classList.add('fa-check');
-                        btnEl.classList.add('copied');
-                        eXide.util.message("Copied results to clipboard");
-                        setTimeout(function () {
-                            icon.classList.remove('fa-check');
-                            icon.classList.add('fa-clipboard');
-                            btnEl.classList.remove('copied');
-                        }, 1200);
-                    }, function(err) {
-                        console.error('Could not copy text: ', err);
-                    });
-                });
-			});
-			document.querySelectorAll('.results-container .next').forEach(function(el) { el.addEventListener("click", app.browseNext); });
-			document.querySelectorAll('.results-container .previous').forEach(function(el) { el.addEventListener("click", app.browsePrevious); });
-			document.querySelectorAll('.results-container .first-page').forEach(function(el) { el.addEventListener("click", app.browseFirst); });
-			document.querySelectorAll('.results-container .last-page').forEach(function(el) { el.addEventListener("click", app.browseLast); });
-
-            function scrollToResult(idx) {
-                var items = document.querySelectorAll('.results-container .results > .even, .results-container .results > .uneven');
-                if (items.length === 0) return;
-                idx = Math.max(0, Math.min(idx, items.length - 1));
-                activeResultIdx = idx;
-                items.forEach(function(el) { el.classList.remove('result-active'); });
-                var target = items[idx];
-                target.classList.add('result-active');
-                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }
-            document.querySelectorAll('.results-container .result-prev').forEach(function(el) {
-                el.addEventListener("click", function(e) {
-                    e.preventDefault();
-                    scrollToResult(activeResultIdx <= 0 ? 0 : activeResultIdx - 1);
-                });
-            });
-            document.querySelectorAll('.results-container .result-next').forEach(function(el) {
-                el.addEventListener("click", function(e) {
-                    e.preventDefault();
-                    scrollToResult(activeResultIdx < 0 ? 1 : activeResultIdx + 1);
-                });
-            });
-            document.getElementById("number-of-results").addEventListener("change", function(ev) {
-                numberOfResults = +document.getElementById("number-of-results").value;
-                if (app._cursorId) {
-                    startOffset = 1;
-                    currentOffset = 1;
-                    endOffset = Math.min(numberOfResults, hitCount);
-                    app.fetchCursorPage(startOffset, endOffset);
-                }
-            });
-            document.getElementById("serialization-mode").addEventListener("change", function(ev) {
-                if (app._cursorId) {
-                    // Re-fetch current page with new serialization settings
-                    app.fetchCursorPage(startOffset, endOffset);
-                } else if (lastQuery) {
-                    app.runQuery(lastQuery);
-                }
-            });
-            // Re-fetch on indent/highlight toggle changes too
-            document.getElementById("indent-results").addEventListener("change", function() {
-                if (app._cursorId) app.fetchCursorPage(startOffset, endOffset);
-            });
-            document.getElementById("auto-expand-matches").addEventListener("change", function() {
-                if (app._cursorId) app.fetchCursorPage(startOffset, endOffset);
-            });
-            document.getElementById("error-status").addEventListener("mouseover", function(ev) {
-                var error = this;
-                var extBar = document.getElementById("ext-status-bar");
-                if (extBar) {
-                    extBar.innerHTML = error.innerHTML;
-                    extBar.style.display = "block";
-                }
-            });
-            var errorStatus = document.getElementById("error-status");
-            var extStatusBar = document.getElementById("ext-status-bar");
-            if (extStatusBar) {
-                extStatusBar.addEventListener("mouseout", function(ev) {
-                    extStatusBar.style.display = "none";
-                });
-            }
-            if (errorStatus) {
-                errorStatus.addEventListener("mouseout", function(ev) {
-                    if (extStatusBar) extStatusBar.style.display = "none";
-                });
-            }
-            window.addEventListener("blur", function() {
-                hasFocus = false;
-            });
-            window.addEventListener("focus", function() {
-                var checkLogin = !hasFocus;
-                hasFocus = true;
-                if (checkLogin) {
-                   app.getLogin();
-                }
-            });
-
-            dialogs["dialog-startup"] = eXide.util.DialogManager.create(
-                document.getElementById("dialog-startup"), {
-                    appendTo: "#layout-container",
-        		    modal: false,
-                    title: "Quick Start",
-                    width: 400,
-                    height: 300,
-    			    buttons: {
-                        "OK" : function() { dialogs["dialog-startup"].close(); }
-    			    }
-    		    }
-    		);
-            if (!util.supportsHtml5Storage)
-    		    return;
-            var showHints = localStorage.getItem("eXide.firstTime");
-            if (!showHints || showHints == 1) {
-                dialogs["dialog-startup"].open();
-            }
-		}
-	};
-
-	return app;
-}(eXide.util));
+  return app;
+})(eXide.util);

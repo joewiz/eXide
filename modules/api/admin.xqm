@@ -1,25 +1,24 @@
 (:
- :  eXide REST API — Admin and monitoring handlers.
- :  Migrated from monitor.xq.
+ : eXide REST API — Admin and monitoring handlers.
+ : Migrated from monitor.xq.
  :)
 xquery version "3.1";
 
-module namespace admin="http://exist-db.org/apps/eXide/api/admin";
+module namespace admin = "http://exist-db.org/apps/eXide/api/admin";
 
-import module namespace roaster="http://e-editiones.org/roaster";
+import module namespace roaster = "http://e-editiones.org/roaster";
 
 (:~
  : GET /api/admin/status — Server health and JMX metrics.
  :)
-declare function admin:status($request as map(*)) {
-    let $jmx :=
-        try { system:get-running-xqueries() } catch * { () }
-    let $token :=
-        try {
-            (: Use util:eval to read the JMX token file — the file module
+declare function admin:status ($request as map(*)) {
+    let $jmx := try { system:get-running-xqueries() } catch * { () }
+    let $token := try {
+        (: Use util:eval to read the JMX token file — the file module
                may be registered under different namespaces depending on
                the eXist-db version, so we try both dynamically. :)
-            util:eval(``[
+        util:eval(
+            ``[
                 let $path := system:get-exist-home() || "/data/jmxservlet.token"
                 return
                     if ("http://expath.org/ns/file" = util:registered-modules()) then
@@ -27,13 +26,14 @@ declare function admin:status($request as map(*)) {
                     else if ("http://exist-db.org/xquery/file" = util:registered-modules()) then
                         util:eval("import module namespace f='http://exist-db.org/xquery/file' at 'java:org.exist.xquery.modules.file.FileModule'; f:read('" || $path || "')")
                     else ()
-            ]``)
-        } catch * { () }
-    let $token-line :=
-        if (exists($token)) then
-            let $line := tokenize($token, "\n")[starts-with(., "token=")]
-            return substring-after($line, "token=")
-        else ()
+            ]``
+        )
+    } catch * { () }
+    let $token-line := if (exists($token)) then
+        let $line := tokenize($token, "\n")[starts-with(., "token=")]
+        return substring-after($line, "token=")
+    else (
+    )
     return map {
         "version": system:get-version(),
         "revision": system:get-revision(),
@@ -47,35 +47,37 @@ declare function admin:status($request as map(*)) {
 (:~
  : GET /api/admin/queries — Running and recent queries.
  :)
-declare function admin:queries($request as map(*)) {
+declare function admin:queries ($request as map(*)) {
     let $running := system:get-running-xqueries()
     return map {
-        "queries": array {
-            for $query in $running//system:query
-            return map {
-                "id": $query/@id/string(),
-                "sourceType": $query/@sourceType/string(),
-                "started": $query/@started/string(),
-                "terminating": string($query/@terminating),
-                "sourceKey": $query/system:sourceKey/string()
-            }
-        }
+        "queries":
+            array
+                {
+                    for $query in $running//system:query
+                    return map {
+                        "id": $query/@id/string(),
+                        "sourceType": $query/@sourceType/string(),
+                        "started": $query/@started/string(),
+                        "terminating": string($query/@terminating),
+                        "sourceKey": $query/system:sourceKey/string()
+                    }
+                }
     }
 };
 
 (:~
  : GET /api/admin/accounts — List users and groups (for permissions dialogs).
  :)
-declare function admin:accounts($request as map(*)) {
+declare function admin:accounts ($request as map(*)) {
     map {
-        "users": array {
-            distinct-values(
-                for $group in sm:list-groups()
-                return
-                    try { sm:get-group-members($group) }
-                    catch * { () }
-            )
-        },
+        "users":
+            array
+                {
+                    distinct-values(
+                        for $group in sm:list-groups()
+                        return try { sm:get-group-members($group) } catch * { () }
+                    )
+                },
         "groups": array { sm:list-groups() }
     }
 };
@@ -83,14 +85,10 @@ declare function admin:accounts($request as map(*)) {
 (:~
  : DELETE /api/admin/queries/{id} — Kill a running query.
  :)
-declare function admin:kill-query($request as map(*)) {
+declare function admin:kill-query ($request as map(*)) {
     let $id := $request?parameters?id
-    return
-        try {
-            let $_ := system:kill-running-xquery(xs:integer($id))
-            return map { "status": "ok" }
-        } catch * {
-            roaster:response(400, "application/json",
-                map { "error": $err:description })
-        }
+    return try {
+        let $_ := system:kill-running-xquery(xs:integer($id))
+        return map {"status": "ok"}
+    } catch * { roaster:response(400, "application/json", map {"error": $err:description}) }
 };

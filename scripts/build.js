@@ -2,45 +2,43 @@ const esbuild = require("esbuild");
 const chalk = require("chalk");
 const mfs = require("micro-fs");
 const path = require("path");
-const fs = require('fs');
+const fs = require("fs");
 const request = require("request");
 const commandLineArgs = require("command-line-args");
 const { version } = require("../package.json");
-const { servers } = require('../.existdb.json');
+const { servers } = require("../.existdb.json");
 
 const args = commandLineArgs([
-    { name: "command", type: String, defaultOption: true, defaultValue: 'build' },
-    { name: "dev", type: Boolean },
-	{ name: "deploy", type: String }
+  { name: "command", type: String, defaultOption: true, defaultValue: "build" },
+  { name: "dev", type: Boolean },
+  { name: "deploy", type: String },
 ]);
 
 function deploy() {
-	const fileName = `eXide-${version}.xar`;
-	const sourcePath = path.join(__dirname, `../build/eXide-${version}.xar`);
-	const targetPath = `/db/system/repo/${fileName}`;
-	const url = `${servers[args.deploy].server}/rest${targetPath}`;
-	const options = {
-		uri: url,
-		method: "PUT",
-		strictSSL: false,
-		headers: {
-			"Content-Type": "application/octet-stream",
-		},
-		auth: {
-			user: servers[args.deploy].user,
-			pass: servers[args.deploy].password,
-			sendImmediately: true,
-		},
-	};
-	console.log(chalk`Uploading xar {cyan ${sourcePath}} to ${servers[args.deploy].server}`);
-	fs.createReadStream(sourcePath).pipe(
-		request(
-			options,
-			function (error, response) {
-				if (error || response.statusCode !== 201) {
-					console.error(`Upload failed with %s`, error);
-				}
-				const xquery = `
+  const fileName = `eXide-${version}.xar`;
+  const sourcePath = path.join(__dirname, `../build/eXide-${version}.xar`);
+  const targetPath = `/db/system/repo/${fileName}`;
+  const url = `${servers[args.deploy].server}/rest${targetPath}`;
+  const options = {
+    uri: url,
+    method: "PUT",
+    strictSSL: false,
+    headers: {
+      "Content-Type": "application/octet-stream",
+    },
+    auth: {
+      user: servers[args.deploy].user,
+      pass: servers[args.deploy].password,
+      sendImmediately: true,
+    },
+  };
+  console.log(chalk`Uploading xar {cyan ${sourcePath}} to ${servers[args.deploy].server}`);
+  fs.createReadStream(sourcePath).pipe(
+    request(options, function (error, response) {
+      if (error || response.statusCode !== 201) {
+        console.error(`Upload failed with %s`, error);
+      }
+      const xquery = `
 					xquery version "3.1";
 
 					declare namespace expath="http://expath.org/ns/pkg";
@@ -84,153 +82,157 @@ function deploy() {
 					return
 						repo:get-root()
 				`;
-				const url = `${servers[args.deploy].server}/rest/db?_query=${encodeURIComponent(xquery)}&_wrap=no`;
-				const options = {
-					uri: url,
-					method: "GET",
-					json: true,
-					auth: {
-						user: servers[args.deploy].user,
-						pass: servers[args.deploy].password,
-						sendImmediately: true,
-					},
-				};
-				console.log(chalk.cyan('Installing xar ...'));
-				request(options, function (error, response, body) {
-					if (error || !(response.statusCode == 200 || response.statusCode == 201)) {
-						console.error(`Installation failed with %s`, error);
-					} else {
-						console.log('DONE');
-					}
-				});
-			}
-		)
-	);
+      const url = `${servers[args.deploy].server}/rest/db?_query=${encodeURIComponent(xquery)}&_wrap=no`;
+      const options = {
+        uri: url,
+        method: "GET",
+        json: true,
+        auth: {
+          user: servers[args.deploy].user,
+          pass: servers[args.deploy].password,
+          sendImmediately: true,
+        },
+      };
+      console.log(chalk.cyan("Installing xar ..."));
+      request(options, function (error, response, body) {
+        if (error || !(response.statusCode == 200 || response.statusCode == 201)) {
+          console.error(`Installation failed with %s`, error);
+        } else {
+          console.log("DONE");
+        }
+      });
+    })
+  );
 }
 
 async function prepare() {
-	const buildDir = path.join(__dirname, "..", "build");
-	if (!fs.existsSync(buildDir)) {
-		fs.mkdirSync(buildDir);
-	}
+  const buildDir = path.join(__dirname, "..", "build");
+  if (!fs.existsSync(buildDir)) {
+    fs.mkdirSync(buildDir);
+  }
 }
 
 async function clean() {
-    console.log(chalk.blue('Cleaning files ...'));
-    await mfs.delete([
-        'resources/scripts/eXide.min.*',
-'resources/scripts/prettier-bundle.js',
-        'index.html',
-        'expath-pkg.xml'
-    ], { allowEmpty: true, silent: false });
+  console.log(chalk.blue("Cleaning files ..."));
+  await mfs.delete(
+    [
+      "resources/scripts/eXide.min.*",
+      "resources/scripts/prettier-bundle.js",
+      "index.html",
+      "expath-pkg.xml",
+    ],
+    { allowEmpty: true, silent: false }
+  );
 }
 
 async function bundle() {
-    console.log(chalk.blue('Bundling eXide source files ...'));
-    await esbuild
-		.build({
-			entryPoints: ["./scripts/bundle.js"],
-			outfile: "./resources/scripts/eXide.min.js",
-			bundle: true,
-			minify: !args.dev,
-			sourcemap: !args.dev,
-			external: ["lib/*"],
-			logLevel: "info",
-		})
-		.catch((err) => {
-			console.error(err);
-			process.exit(1);
-		});
+  console.log(chalk.blue("Bundling eXide source files ..."));
+  await esbuild
+    .build({
+      entryPoints: ["./scripts/bundle.js"],
+      outfile: "./resources/scripts/eXide.min.js",
+      bundle: true,
+      minify: !args.dev,
+      sourcemap: !args.dev,
+      external: ["lib/*"],
+      logLevel: "info",
+    })
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
 
-    // Bundle XQuery 4.0 parser as a separate lazy-loaded file
-    const parser40Path = path.join(__dirname, '..', 'src', 'parser', 'XQueryParser40.js');
-    if (fs.existsSync(parser40Path)) {
-        console.log(chalk.blue('Bundling XQuery 4.0 parser (lazy-loaded) ...'));
-        await esbuild
-            .build({
-                entryPoints: [parser40Path],
-                outfile: "./resources/scripts/xquery-parser-40.js",
-                bundle: true,
-                minify: !args.dev,
-                logLevel: "info",
-                globalName: "XQueryParser40",
-                format: "iife",
-            })
-            .catch((err) => {
-                console.error(err);
-                process.exit(1);
-            });
-    }
+  // Bundle XQuery 4.0 parser as a separate lazy-loaded file
+  const parser40Path = path.join(__dirname, "..", "src", "parser", "XQueryParser40.js");
+  if (fs.existsSync(parser40Path)) {
+    console.log(chalk.blue("Bundling XQuery 4.0 parser (lazy-loaded) ..."));
+    await esbuild
+      .build({
+        entryPoints: [parser40Path],
+        outfile: "./resources/scripts/xquery-parser-40.js",
+        bundle: true,
+        minify: !args.dev,
+        logLevel: "info",
+        globalName: "XQueryParser40",
+        format: "iife",
+      })
+      .catch((err) => {
+        console.error(err);
+        process.exit(1);
+      });
+  }
 }
 
 function replace(path, outPath, data) {
-    const content = fs.readFileSync(`${__dirname}/../${path}`, "utf-8");
-    const replaced = content.toString().replace(/{{(.*)?}}/g, function (match, p1) {
-		return data[p1] || "";
-	});
-    fs.writeFileSync(`${__dirname}/../${outPath}`, replaced);
+  const content = fs.readFileSync(`${__dirname}/../${path}`, "utf-8");
+  const replaced = content.toString().replace(/{{(.*)?}}/g, function (match, p1) {
+    return data[p1] || "";
+  });
+  fs.writeFileSync(`${__dirname}/../${outPath}`, replaced);
 }
 
 (async () => {
-    if (args.command === 'clean') {
-        await clean();
-        return;
-    } else if (args.command === 'prepare') {
-        await prepare();
-        return;
-    }
+  if (args.command === "clean") {
+    await clean();
+    return;
+  } else if (args.command === "prepare") {
+    await prepare();
+    return;
+  }
 
-    replace('expath-pkg.xml.tmpl', 'expath-pkg.xml', { version });
-    replace("index.html.tmpl", "index.html", { version });
+  replace("expath-pkg.xml.tmpl", "expath-pkg.xml", { version });
+  replace("index.html.tmpl", "index.html", { version });
 
-    await bundle();    
+  await bundle();
 
-    console.log(chalk`Creating xar {cyan eXide-${version}.xar}`);
-    mfs.zip(
-		[
-			"*.*",
-			"modules/**/*",
-			"resources/**/*",
-			"templates/**/*",
-			"docs/**/*",
-			"!.git*",
-			"!*.tmpl",
-			"!*.properties",
-			"!.github/**",
-			"!node_modules/**",
-			"!package-lock.json",
-			"!cypress/**",
-			"!scripts/**",
-			"!tools/**",
-			"!test/**",
-			"!support/**",
-			"!src/**",
-			"!resources/scripts/*.map",
-			"!resources/images/background.gif",
-			"!resources/images/fullscreen.png",
-			"!resources/images/layouts_split.png",
-			"!resources/images/layouts_split_vertical.png",
-			"!resources/images/header.gif",
-			"!resources/images/exide.png",
-			"!resources/images/exide.svg",
-			"!resources/images/toggle-dn.gif",
-			"!resources/images/toggle-lt.gif",
-			"!resources/images/toggle-up.gif",
-			"!resources/images/toggle-rt.gif",
-			"!resources/css/font-awesome/fonts/fontawesome-webfont.svg",
-			"!resources/css/font-awesome/fonts/fontawesome-webfont.ttf",
-			"!resources/css/font-awesome/fonts/FontAwesome.otf",
-			"!resources/css/font-awesome/fonts/fontawesome-webfont.eot",
-			"!CLAUDE.md",
-			"!grammars/**",
-			"!build.js",
-		],
-		`build/eXide-${version}.xar`,
-		{ base : '.' }
-	).then(() => {
-		console.log(chalk.bold('DONE.'));
-		if (args.deploy) {
-			deploy();
-		}
-	});
+  console.log(chalk`Creating xar {cyan eXide-${version}.xar}`);
+  mfs
+    .zip(
+      [
+        "*.*",
+        "modules/**/*",
+        "resources/**/*",
+        "templates/**/*",
+        "docs/**/*",
+        "!.git*",
+        "!*.tmpl",
+        "!*.properties",
+        "!.github/**",
+        "!node_modules/**",
+        "!package-lock.json",
+        "!cypress/**",
+        "!scripts/**",
+        "!tools/**",
+        "!test/**",
+        "!support/**",
+        "!src/**",
+        "!resources/scripts/*.map",
+        "!resources/images/background.gif",
+        "!resources/images/fullscreen.png",
+        "!resources/images/layouts_split.png",
+        "!resources/images/layouts_split_vertical.png",
+        "!resources/images/header.gif",
+        "!resources/images/exide.png",
+        "!resources/images/exide.svg",
+        "!resources/images/toggle-dn.gif",
+        "!resources/images/toggle-lt.gif",
+        "!resources/images/toggle-up.gif",
+        "!resources/images/toggle-rt.gif",
+        "!resources/css/font-awesome/fonts/fontawesome-webfont.svg",
+        "!resources/css/font-awesome/fonts/fontawesome-webfont.ttf",
+        "!resources/css/font-awesome/fonts/FontAwesome.otf",
+        "!resources/css/font-awesome/fonts/fontawesome-webfont.eot",
+        "!CLAUDE.md",
+        "!grammars/**",
+        "!build.js",
+      ],
+      `build/eXide-${version}.xar`,
+      { base: "." }
+    )
+    .then(() => {
+      console.log(chalk.bold("DONE."));
+      if (args.deploy) {
+        deploy();
+      }
+    });
 })();

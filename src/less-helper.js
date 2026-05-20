@@ -22,116 +22,123 @@ eXide.namespace("eXide.edit.LessModeHelper");
  * Less specific helper methods.
  */
 eXide.edit.LessModeHelper = (function () {
-
-    function saveCSS (path, css) {
-        fetch("store/" + path, {
-            method: "PUT",
-            headers: { "Content-Type": "text/css" },
-            body: css
-        })
-        .then(function(response) { return response.json(); })
-        .then(function(data) {
-            if (data.status == "error") {
-                return eXide.util.error(data.message);
-            }
-            eXide.util.message(path + " stored.");
-        })
-        .catch(function(err) {
-            eXide.util.error(String(err));
-        });
-    }
-
-    var Constr = function(editor) {
-        this.parent = editor;
-        this.editor = this.parent.editor;
-        this.addCommand("locate", this.locate);
-        this.addCommand("format", this.format);
-        this.addCommand("gotoSymbol", this.gotoSymbol);
-    };
-
-    eXide.util.oop.inherit(Constr, eXide.edit.ModeHelper);
-
-    Constr.prototype.documentSaved = function(doc) {
-        var path = doc.getExternalLink();
-        var code = doc.getText();
-
-        if (/\/_.+\.less$/.test(path)) {
-          return eXide.util.error("CSS not compiled for include : " + path);
+  function saveCSS(path, css) {
+    fetch("store/" + path, {
+      method: "PUT",
+      headers: { "Content-Type": "text/css" },
+      body: css,
+    })
+      .then(function (response) {
+        return response.json();
+      })
+      .then(function (data) {
+        if (data.status == "error") {
+          return eXide.util.error(data.message);
         }
+        eXide.util.message(path + " stored.");
+      })
+      .catch(function (err) {
+        eXide.util.error(String(err));
+      });
+  }
 
-        var options = {
-            filename: path
-        };
+  var Constr = function (editor) {
+    this.parent = editor;
+    this.editor = this.parent.editor;
+    this.addCommand("locate", this.locate);
+    this.addCommand("format", this.format);
+    this.addCommand("gotoSymbol", this.gotoSymbol);
+  };
 
-        var header = "/**\n" +
-                      " * THIS IS A GENERATED FILE\n" +
-                      " * to make changes edit\n" +
-                      " * " + path + "\n" +
-                      " */\n\n";
+  eXide.util.oop.inherit(Constr, eXide.edit.ModeHelper);
 
-        var handler = function (err, output) {
-            if (err) {
-                return eXide.util.error("Error: " + err.message);
-            }
-            eXide.util.message("Compiled less file: " + path);
-            var cssPath = doc.getPath().replace(/\.less$/, ".css");
-            saveCSS(cssPath, header + output.css);
-        };
-        less.render(code, options, handler);
-    };
+  Constr.prototype.documentSaved = function (doc) {
+    var path = doc.getExternalLink();
+    var code = doc.getText();
 
-    Constr.prototype.saveCSS = saveCSS;
-
-    Constr.prototype.createOutline = function(doc, onComplete) {
-        var state = this.editor.state;
-        var tree = CM6.ensureSyntaxTree(state, state.doc.length, 5000) || CM6.syntaxTree(state);
-        tree.iterate({
-            enter: function(node) {
-                if (node.name === "RuleSet") {
-                    var blockStart = node.to;
-                    var child = node.node.firstChild;
-                    while (child) {
-                        if (child.name === "Block") { blockStart = child.from; break; }
-                        child = child.nextSibling;
-                    }
-                    var selector = state.sliceDoc(node.from, blockStart).trim();
-                    if (selector) {
-                        var line = state.doc.lineAt(node.from);
-                        doc.functions.push({
-                            type: eXide.edit.Document.TYPE_FUNCTION,
-                            name: selector,
-                            source: doc.getPath(),
-                            signature: selector,
-                            sort: selector,
-                            row: line.number - 1,
-                            from: node.from,
-                            to: node.to
-                        });
-                    }
-                    return false;
-                }
-                if (node.name === "MediaStatement" || node.name === "KeyframesStatement") {
-                    var text = state.sliceDoc(node.from, node.to);
-                    var braceIdx = text.indexOf("{");
-                    if (braceIdx >= 0) text = text.substring(0, braceIdx).trim();
-                    if (text.length > 60) text = text.substring(0, 60) + "…";
-                    var line = state.doc.lineAt(node.from);
-                    doc.functions.push({
-                        type: eXide.edit.Document.TYPE_FUNCTION,
-                        name: text,
-                        source: doc.getPath(),
-                        signature: text,
-                        sort: text,
-                        row: line.number - 1,
-                        from: node.from,
-                        to: node.to
-                    });
-                }
-            }
-        });
-        this.collectErrors(doc);
-        if (onComplete) onComplete(doc);
+    if (/\/_.+\.less$/.test(path)) {
+      return eXide.util.error("CSS not compiled for include : " + path);
     }
 
-    return Constr;
-}());
+    var options = {
+      filename: path,
+    };
+
+    var header =
+      "/**\n" +
+      " * THIS IS A GENERATED FILE\n" +
+      " * to make changes edit\n" +
+      " * " +
+      path +
+      "\n" +
+      " */\n\n";
+
+    var handler = function (err, output) {
+      if (err) {
+        return eXide.util.error("Error: " + err.message);
+      }
+      eXide.util.message("Compiled less file: " + path);
+      var cssPath = doc.getPath().replace(/\.less$/, ".css");
+      saveCSS(cssPath, header + output.css);
+    };
+    less.render(code, options, handler);
+  };
+
+  Constr.prototype.saveCSS = saveCSS;
+
+  Constr.prototype.createOutline = function (doc, onComplete) {
+    var state = this.editor.state;
+    var tree = CM6.ensureSyntaxTree(state, state.doc.length, 5000) || CM6.syntaxTree(state);
+    tree.iterate({
+      enter: function (node) {
+        if (node.name === "RuleSet") {
+          var blockStart = node.to;
+          var child = node.node.firstChild;
+          while (child) {
+            if (child.name === "Block") {
+              blockStart = child.from;
+              break;
+            }
+            child = child.nextSibling;
+          }
+          var selector = state.sliceDoc(node.from, blockStart).trim();
+          if (selector) {
+            var line = state.doc.lineAt(node.from);
+            doc.functions.push({
+              type: eXide.edit.Document.TYPE_FUNCTION,
+              name: selector,
+              source: doc.getPath(),
+              signature: selector,
+              sort: selector,
+              row: line.number - 1,
+              from: node.from,
+              to: node.to,
+            });
+          }
+          return false;
+        }
+        if (node.name === "MediaStatement" || node.name === "KeyframesStatement") {
+          var text = state.sliceDoc(node.from, node.to);
+          var braceIdx = text.indexOf("{");
+          if (braceIdx >= 0) text = text.substring(0, braceIdx).trim();
+          if (text.length > 60) text = text.substring(0, 60) + "…";
+          var line = state.doc.lineAt(node.from);
+          doc.functions.push({
+            type: eXide.edit.Document.TYPE_FUNCTION,
+            name: text,
+            source: doc.getPath(),
+            signature: text,
+            sort: text,
+            row: line.number - 1,
+            from: node.from,
+            to: node.to,
+          });
+        }
+      },
+    });
+    this.collectErrors(doc);
+    if (onComplete) onComplete(doc);
+  };
+
+  return Constr;
+})();

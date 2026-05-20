@@ -1,6 +1,6 @@
 /*
  *  eXide - web-based XQuery IDE
- *  
+ *
  *  Copyright (C) 2013 Wolfgang Meier
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -22,19 +22,18 @@ eXide.namespace("eXide.edit.SnippetModeHelper");
  * XML specific helper methods.
  */
 eXide.edit.SnippetModeHelper = (function () {
-    
-    Constr = function(editor) {
-		this.parent = editor;
-		this.editor = this.parent.editor;
-	};
-	
-	eXide.util.oop.inherit(Constr, eXide.edit.ModeHelper);
+  Constr = function (editor) {
+    this.parent = editor;
+    this.editor = this.parent.editor;
+  };
 
-    Constr.prototype.documentSaved = function(doc) {
-        var code = doc.getText();
-        var mode = doc.getName().replace(/\.snippets/, "");
-        eXide.util.Snippets.reload(mode, code);
-    };
-    
-	return Constr;
-}());
+  eXide.util.oop.inherit(Constr, eXide.edit.ModeHelper);
+
+  Constr.prototype.documentSaved = function (doc) {
+    var code = doc.getText();
+    var mode = doc.getName().replace(/\.snippets/, "");
+    eXide.util.Snippets.reload(mode, code);
+  };
+
+  return Constr;
+})();

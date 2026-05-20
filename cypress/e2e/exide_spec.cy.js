@@ -1,18 +1,17 @@
-describe('eXide', () => {
+describe("eXide", () => {
   beforeEach(() => {
-    cy.visit('/eXide/index.html')
+    cy.visit("/eXide/index.html");
     // Reload in case there is weird earlier version warning
-    cy.reload(true)
-  })
+    cy.reload(true);
+  });
 
-  it('loads the editor page', () => {
-    cy.url()
-      .should('include', '/eXide/index.html');
-  })
+  it("loads the editor page", () => {
+    cy.url().should("include", "/eXide/index.html");
+  });
 
-  it('displays the editor with default document', () => {
-    cy.get('.path').should('contain', 'untitled-1');
-  })
+  it("displays the editor with default document", () => {
+    cy.get(".path").should("contain", "untitled-1");
+  });
 
   // Add more tests here
-})
+});

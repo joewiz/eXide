@@ -3,25 +3,32 @@
     <section>
         <img src="resources/images/help1.png"/>
         <h1>Auto-completion and Templates</h1>
-        <p>To select a template, complete a variable reference or a function call, press the <code>Tab</code> key after 
+        <p>To select a template, complete a variable reference or a function call, press the <code
+        >Tab</code> key after 
             a character sequence. The suggestions shown depend on the current context. For example, to complete a variable reference, 
             type $ followed by the first characters of the variable and press <code>Tab</code>.
-            To enforce auto-complete and see all suggestions, press <code>Ctrl-Space</code> (or <code>Option-Space</code> on Firefox for Mac), which
+            To enforce auto-complete and see all suggestions, press <code
+        >Ctrl-Space</code> (or <code>Option-Space</code> on Firefox for Mac), which
             will also show a list of all available templates when activated on a new line or after whitespace.</p>
-        <p>If there's only one suggestion, it will be inserted immediately. Otherwise, a popup is shown. In the popup, use the cursor 
+        <p
+        >If there's only one suggestion, it will be inserted immediately. Otherwise, a popup is shown. In the popup, use the cursor 
             keys to choose a suggested code or function template. Press
             <code>Enter</code> to select the current template.</p>
     </section>
     <section>
         <h1>Code Templates</h1>
-        <p>eXide supports the same code templates as the textmate editor (a well-known editor on the Mac). To see all available code
-            templates in a mode, place the cursor after whitespace and press <code>Ctrl-Space</code> (or <code>Option-Space</code>).</p>
-        <p>For example, to add a new function, enter "fun" and press <code>Tab</code>. Some templates also respect the current text
+        <p
+        >eXide supports the same code templates as the textmate editor (a well-known editor on the Mac). To see all available code
+            templates in a mode, place the cursor after whitespace and press <code
+        >Ctrl-Space</code> (or <code>Option-Space</code>).</p>
+        <p>For example, to add a new function, enter "fun" and press <code
+        >Tab</code>. Some templates also respect the current text
             selection: to transform a block of code into a "let" statement, select the block, call autocomplete and choose the
             "let" template.
         </p>
         <h3>Adding Templates</h3>
-        <p>New templates can be added by editing the <code>.snippets</code> files which can be found in the <code>eXide/templates</code> 
+        <p>New templates can be added by editing the <code
+        >.snippets</code> files which can be found in the <code>eXide/templates</code> 
             collection.</p>
     </section>
     <section>
@@ -44,7 +51,8 @@
     </section>
     <section>
         <h1>Code Hints and Quick Fixes</h1>
-        <p>eXide continuously validates your XQuery code. Errors show up with a red icon in the side bar, while code hints appear with
+        <p
+        >eXide continuously validates your XQuery code. Errors show up with a red icon in the side bar, while code hints appear with
             a yellow warning sign. Moving the mouse over the icon displays a description. For some types of errors or warnings, a quick fix might be
             available if you click on the icon. Currently this includes the following errors/warnings:</p>
         <ul>
@@ -57,12 +65,15 @@
     <section>
         <h1>Refactoring</h1>
         <h2>Variables and Function Names</h2>
-        <p>In XQuery mode, eXide can refactor local variables and function names. To start refactoring, place the cursor into the name
-            of the function in a function declaration or the name of a variable. Select the <strong>Rename</strong> action
+        <p
+        >In XQuery mode, eXide can refactor local variables and function names. To start refactoring, place the cursor into the name
+            of the function in a function declaration or the name of a variable. Select the <strong
+        >Rename</strong> action
             from the XQuery menu. All occurrences of the function or variable will be added to the current editor selection. All selections
             will change synchronously as you type. To end the editing, press <code>ESC</code>.</p>
         <h2>Extract New Function</h2>
-        <p>To create a new function from a selected piece of code, choose the menu item <strong>Extract function</strong> from
+        <p>To create a new function from a selected piece of code, choose the menu item <strong
+        >Extract function</strong> from
         the XQuery menu. The selection must contain a complete code block. This code will be parsed and a new function is
         created from it with all required parameters declared.</p>
     </section>
